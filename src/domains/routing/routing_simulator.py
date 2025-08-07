@@ -60,7 +60,7 @@ def generate_package_request(pkg_name, lat_dist: uniform,
     """
     Create a random package delivery request.
     """
-    
+
     # lat = lat_dist.rvs(random_state=rng)
     # lon = lon_dist.rvs(random_state=rng)
     # delivery = LatLonCoords(lat=lat, lon=lon)

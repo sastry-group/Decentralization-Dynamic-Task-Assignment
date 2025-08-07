@@ -248,11 +248,11 @@ def main():
                 csv_logger=csv_logger,
                 in_transit_packages=in_transit_pkgs
             )
-            plot_initial_map(
-                depot_locs=DEPOT_LOCS, drones=server.agent_set,
-                package_dict=sim.active_packages,
-                radius_km=sim.distance_thresh,
-                trial=trial)
+            # plot_initial_map(
+            #     depot_locs=DEPOT_LOCS, drones=server.agent_set,
+            #     package_dict=sim.active_packages,
+            #     radius_km=sim.distance_thresh,
+            #     trial=trial)
             
             timing_per_timestep = [] 
             for t in range(args['timesteps']):

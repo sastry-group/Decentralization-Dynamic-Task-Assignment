@@ -17,7 +17,7 @@ mean_time = {a: [] for a in algos}
 sem_time = {a: [] for a in algos}
 
 # Extract n_drones and n_depots from sample file
-sample_folder = f"dr5_dep2_probpt{str(probs[0]).replace('.','')}_win10_{algos[0]}"
+sample_folder = f"dr15_dep5_probpt{str(probs[0]).replace('.','')}_win10_{algos[0]}"
 sample_fn = os.path.join(base_dir, sample_folder, f"{sample_folder}.json")
 m = re.search(r"dr(\d+)_dep(\d+)", sample_fn)
 n_drones, n_depots = m.groups() if m else ("?", "?")

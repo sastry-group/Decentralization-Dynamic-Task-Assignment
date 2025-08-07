@@ -116,7 +116,7 @@ def best_response_utility(current_time, ie, reward=1000):
 
 def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimulator, rng=None, csv_logger=None,
                             init_method = "greedy", trial_id=None, time_step=None):
-    max_iters = 10
+    max_iters = 20
     depots: Dict[int, List[str]] = {}
     # group drones by depot
     for dn, dp in server.agent_prop_set.items():
@@ -206,6 +206,45 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
 
                     if ie.task_name in assigned or ie.task_name in routing_sim.busy_packages:
                         continue
+                    # u = compute_utility(
+                    #     ie=ie,
+                    #     agent=dn,
+                    #     assigned=assigned,
+                    #     server=server,
+                    #     routing_sim=routing_sim,
+                    #     mode="exact",  # or "exact"
+                    #     lambda_conflict=500,
+                    #     delivery_reward=routing_sim.delivery_reward
+                    # )
+                    u = delivery_util(routing_sim.delivery_reward, ie)
+                    if u > best_util:
+                        best_util = u
+                        best_ie = ie
+                if best_ie:
+                    assigned[dn] = best_ie.task_name
+                    best_ies[dn] = (best_ie.task_name, best_util)
+                    final_assignment[dn] = (best_ie.task_name, best_util, best_ie) 
+                else:
+                    best_ies[dn] = (None, 0.0)
+
+                     
+
+        iter_count = 0
+        updated = True
+        while updated and iter_count < max_iters:
+            updated = False
+            for dn in drones:
+                if not server.agent_prop_set[dn].at_depot:
+                    continue # skip drones in transit
+                neighbors = [other_dn for other_dn in drones if other_dn != dn]
+                assigned_pkgs = {assigned[n] for n in neighbors if assigned.get(n) is not None}
+                best_ie = None
+                best_util = float("-inf")
+                for ie in interaction_events_by_drone.get(dn, []):
+                    pkg = ie.task_name
+                    if pkg in assigned_pkgs or pkg in routing_sim.busy_packages or pkg in assigned.values():
+                        continue
+                    # u = delivery_util(routing_sim.delivery_reward, ie)
                     u = compute_utility(
                         ie=ie,
                         agent=dn,
@@ -219,40 +258,11 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     if u > best_util:
                         best_util = u
                         best_ie = ie
-                if best_ie:
-                    assigned[dn] = best_ie.task_name
-                    best_ies[dn] = (best_ie.task_name, best_util)
-                    final_assignment[dn] = (best_ie.task_name, best_util, best_ie) 
-                else:
-                    best_ies[dn] = (None, 0.0)
-
-                     
-
-
-        for _ in range(max_iters):
-            updated = False
-            for dn in drones:
-                if not server.agent_prop_set[dn].at_depot:
-                    continue # skip drones in transit
-                neighbors = [other_dn for other_dn in drones if other_dn != dn]
-                assigned_pkgs = {assigned[n] for n in neighbors if assigned[n] is not None}
-                best_ie = None
-                best_util = float("-inf")
-                for ie in interaction_events_by_drone.get(dn, []):
-                    pkg = ie.task_name
-                    if pkg in assigned_pkgs or pkg in routing_sim.busy_packages or pkg in assigned.values():
-                        continue
-                    u = delivery_util(routing_sim.delivery_reward, ie)
-                    if u > best_util:
-                        best_util = u
-                        best_ie = ie
                 if best_ie and assigned[dn] != best_ie.task_name:
                     assigned[dn] = best_ie.task_name                    
                     updated = True
                     final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
-
-            if not updated:
-                break
+            iter_count += 1
 
     for dn, pkg in assigned.items():
         if pkg in routing_sim.busy_packages:
@@ -269,7 +279,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
             routing_sim.true_delivery_return[(dn, pkg)] = (td, rt)
             server.agent_prop_set[dn].at_depot = False
             server.agent_prop_set[dn].current_package = pkg
-            
+
             routing_sim.busy_packages[pkg] = routing_sim.active_packages.pop(pkg)
             routing_sim.num_active_packages -= 1
             final_pkg, util, ie = final_assignment[dn]
