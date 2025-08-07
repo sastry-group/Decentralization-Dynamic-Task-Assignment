@@ -12,6 +12,7 @@ from numpy.random import MT19937, RandomState
 # from pomdp_py.algorithms.po_uct import POUCT
 from scipy.stats import uniform
 import logging
+import time
 
 from csv_logger import CSVLogger
 
@@ -253,18 +254,25 @@ def main():
                 radius_km=sim.distance_thresh,
                 trial=trial)
             
+            timing_per_timestep = [] 
             for t in range(args['timesteps']):
                 # print("time ", t)
                 # logging.info(f"--- [t={t}] BEGIN TIMESTEP --- current_time = {sim.current_time}")
                 update_time_windows(sim, server, csv_logger=csv_logger)
                 assign = bool(sim.active_packages)
                 if assign:
+                    start_time = time.perf_counter()
                     fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t)
+                    end_time = time.perf_counter()
+                    elapsed_time = end_time - start_time
+                    timing_per_timestep.append(elapsed_time)
                 else:
                     logging.info(f"No active packages available. Skipping assignment.")
 
                 update_routing_sim(sim, server, rng, csv_logger=csv_logger)
                 
+
+
             late_pkgs.append(sim.late_packages)
             in_transit_pkgs.append(len(sim.busy_packages))
             delivered_pkgs.append(sim.delivered_packages)
@@ -274,6 +282,9 @@ def main():
         
 
     # Output
+    if timing_per_timestep:
+        avg_time = sum(timing_per_timestep) / len(timing_per_timestep)
+        results['avg_time_per_assignment_step_sec'] = avg_time
     results['late'] = late_pkgs
     results['in_transit'] = in_transit_pkgs
     results['delivered'] = delivered_pkgs

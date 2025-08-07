@@ -13,6 +13,8 @@ base_dir = "results/logs"
 # Initialize result holders
 mean_late = {a: [] for a in algos}
 sem_late = {a: [] for a in algos}
+mean_time = {a: [] for a in algos}
+sem_time = {a: [] for a in algos}
 
 # Extract n_drones and n_depots from sample file
 sample_folder = f"dr5_dep2_probpt{str(probs[0]).replace('.','')}_win10_{algos[0]}"
@@ -37,6 +39,14 @@ for a in algos:
         sem_late[a].append(
             late.std(ddof=1) / np.sqrt(len(late)) if len(late) > 1 else 0.0
         )
+        if "avg_time_per_assignment_step_sec" in r:
+            avg_time = r["avg_time_per_assignment_step_sec"]
+            mean_time[a].append(avg_time)
+            sem_time[a].append(0.0)  # Currently no variance across trials
+        else:
+            print(f"Missing 'avg_time_per_assignment_step_sec' in {filepath}")
+            mean_time[a].append(np.nan)
+            sem_time[a].append(0.0)
 
 # Plotting
 x = np.arange(len(probs))
@@ -64,4 +74,28 @@ plt.title(f"{n_drones} drones, {n_depots} depots")
 
 plt.tight_layout()
 plt.savefig("results/frac_late_vs_new_request.png")
-plt.show()
+
+
+
+# ---- timing plot
+fig, ax = plt.subplots(figsize=(6, 4))
+for i, a in enumerate(algos):
+    ax.bar(
+        x + i * width,
+        mean_time[a],
+        width,
+        yerr=sem_time[a],
+        capsize=4,
+        label=a.upper(),
+        color=colors.get(a)
+    )
+
+ax.set_xticks(x + (len(algos) - 1) * width / 2)
+ax.set_xticklabels([str(p) for p in probs])
+ax.set_xlabel("New‐request probability")
+ax.set_ylabel("Avg. assignment time per step (s)")
+ax.set_title(f"Computation Time — {n_drones} drones, {n_depots} depots")
+
+plt.tight_layout()
+ax.legend()
+plt.savefig("results/time_per_assignment_vs_new_request.png")

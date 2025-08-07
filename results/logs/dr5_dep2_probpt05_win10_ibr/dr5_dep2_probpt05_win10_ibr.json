@@ -1,5 +1,6 @@
 {
   "trials": 1,
+  "avg_time_per_assignment_step_sec": 0.00016045236208645457,
   "late": [
     1
   ],
