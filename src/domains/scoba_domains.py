@@ -45,6 +45,13 @@ from domains.routing.routing_scoba import (
     scoba_routing,
 )
 
+
+# iterative best response
+from domains.routing.routing_ibr import (
+    iterative_best_response
+    
+)
+
 # simulator utilities
 from domains.routing.routing_simulator import (
     get_travel_time_estimate,

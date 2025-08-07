@@ -1,303 +1,296 @@
-[2025-08-04 13:20:47,498] INFO:dr5_dep2_probpt05_win10_scoba.json
-[2025-08-04 13:20:47,499] INFO:Running scoba baseline for 1 trials.
-[2025-08-04 13:20:47,803] DEBUG:[SCoBA] Drone dn1 has 4 interaction events. Using max 20
-[2025-08-04 13:20:47,803] INFO:[UtilCheck] Task first time pkg4 → util=8.07
-[2025-08-04 13:20:47,804] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
-[2025-08-04 13:20:47,804] DEBUG:[SCoBA] Drone dn2 has 4 interaction events. Using max 20
-[2025-08-04 13:20:47,804] INFO:[UtilCheck] Task first time pkg4 → util=8.07
-[2025-08-04 13:20:47,804] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
-[2025-08-04 13:20:47,804] DEBUG:[SCoBA] Drone dn3 has 4 interaction events. Using max 20
-[2025-08-04 13:20:47,804] INFO:[UtilCheck] Task first time pkg4 → util=8.07
-[2025-08-04 13:20:47,804] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
-[2025-08-04 13:20:47,804] DEBUG:[SCoBA] Drone dn4 has 4 interaction events. Using max 20
-[2025-08-04 13:20:47,804] INFO:[UtilCheck] Task first time pkg8 → util=8.07
-[2025-08-04 13:20:47,804] INFO:[UtilCheck] Task first time pkg7 → util=8.07
-[2025-08-04 13:20:47,804] INFO:[Debug] pkg branch: attempt util=8.00, skip util=5.78
-[2025-08-04 13:20:47,804] DEBUG:[SCoBA] Drone dn5 has 3 interaction events. Using max 20
-[2025-08-04 13:20:47,804] INFO:[UtilCheck] Task first time pkg8 → util=8.07
-[2025-08-04 13:20:47,804] INFO:[Debug] pkg branch: attempt util=8.07, skip util=7.48
-[2025-08-04 13:20:47,804] INFO:[Coord] Total conflicts this round: 0
-[2025-08-04 13:20:47,804] DEBUG:No more conflicts; returning allocation.
-[2025-08-04 13:20:47,805] INFO:[SCoBA] Unused drones at t=0.0: []
-[2025-08-04 13:20:47,805] INFO:[INFO] SCoBA assigned 1 drones at t=0.0
-[2025-08-04 13:20:47,805] INFO:[t=0.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,805] DEBUG:[Time Step] Advancing to t=0.0
-[2025-08-04 13:20:47,805] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,805] DEBUG:[In Transit] t=1.0 | Drone dn4 still in transit with package pkg7
-[2025-08-04 13:20:47,805] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,805] DEBUG:[SCoBA] Drone dn1 has 4 interaction events. Using max 20
-[2025-08-04 13:20:47,805] INFO:[UtilCheck] Task first time pkg4 → util=8.07
-[2025-08-04 13:20:47,805] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
-[2025-08-04 13:20:47,805] DEBUG:[SCoBA] Drone dn2 has 3 interaction events. Using max 20
-[2025-08-04 13:20:47,805] INFO:[UtilCheck] Task first time pkg3 → util=8.07
-[2025-08-04 13:20:47,805] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
-[2025-08-04 13:20:47,805] DEBUG:[SCoBA] Drone dn3 has 2 interaction events. Using max 20
-[2025-08-04 13:20:47,805] INFO:[UtilCheck] Task first time pkg5 → util=8.07
-[2025-08-04 13:20:47,805] INFO:[UtilCheck] Task first time pkg1 → util=8.07
-[2025-08-04 13:20:47,805] INFO:[Debug] pkg branch: attempt util=8.07, skip util=0.00
-[2025-08-04 13:20:47,805] DEBUG:[SCoBA] Drone dn5 has 3 interaction events. Using max 20
-[2025-08-04 13:20:47,805] INFO:[UtilCheck] Task first time pkg8 → util=8.07
-[2025-08-04 13:20:47,806] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
-[2025-08-04 13:20:47,806] INFO:[Coord] Total conflicts this round: 0
-[2025-08-04 13:20:47,806] DEBUG:No more conflicts; returning allocation.
-[2025-08-04 13:20:47,806] INFO:[SCoBA] Unused drones at t=1.0: []
-[2025-08-04 13:20:47,806] INFO:[INFO] SCoBA assigned 4 drones at t=1.0
-[2025-08-04 13:20:47,806] INFO:[t=1.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,806] DEBUG:[Time Step] Advancing to t=1.0
-[2025-08-04 13:20:47,806] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=2.0 | Drone dn4 still in transit with package pkg7
-[2025-08-04 13:20:47,806] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=2.0 | Drone dn1 still in transit with package pkg4
-[2025-08-04 13:20:47,806] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=2.0 | Drone dn2 still in transit with package pkg3
-[2025-08-04 13:20:47,806] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=2.0 | Drone dn3 still in transit with package pkg1
-[2025-08-04 13:20:47,806] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=2.0 | Drone dn5 still in transit with package pkg8
-[2025-08-04 13:20:47,806] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,806] INFO:[t=2.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,806] DEBUG:[Time Step] Advancing to t=2.0
-[2025-08-04 13:20:47,806] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=3.0 | Drone dn4 still in transit with package pkg7
-[2025-08-04 13:20:47,806] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=3.0 | Drone dn1 still in transit with package pkg4
-[2025-08-04 13:20:47,806] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=3.0 | Drone dn2 still in transit with package pkg3
-[2025-08-04 13:20:47,806] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=3.0 | Drone dn3 still in transit with package pkg1
-[2025-08-04 13:20:47,806] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=3.0 | Drone dn5 still in transit with package pkg8
-[2025-08-04 13:20:47,806] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,806] INFO:[t=3.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,806] DEBUG:[Time Step] Advancing to t=3.0
-[2025-08-04 13:20:47,806] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=4.0 | Drone dn4 still in transit with package pkg7
-[2025-08-04 13:20:47,806] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=4.0 | Drone dn1 still in transit with package pkg4
-[2025-08-04 13:20:47,806] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=4.0 | Drone dn2 still in transit with package pkg3
-[2025-08-04 13:20:47,806] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=4.0 | Drone dn3 still in transit with package pkg1
-[2025-08-04 13:20:47,806] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=4.0 | Drone dn5 still in transit with package pkg8
-[2025-08-04 13:20:47,806] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,806] INFO:[t=4.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,806] DEBUG:[Time Step] Advancing to t=4.0
-[2025-08-04 13:20:47,806] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=5.0 | Drone dn4 still in transit with package pkg7
-[2025-08-04 13:20:47,806] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=5.0 | Drone dn1 still in transit with package pkg4
-[2025-08-04 13:20:47,806] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=5.0 | Drone dn2 still in transit with package pkg3
-[2025-08-04 13:20:47,806] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,806] DEBUG:[In Transit] t=5.0 | Drone dn3 still in transit with package pkg1
-[2025-08-04 13:20:47,807] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=5.0 | Drone dn5 still in transit with package pkg8
-[2025-08-04 13:20:47,807] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,807] INFO:[t=5.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,807] DEBUG:[Time Step] Advancing to t=5.0
-[2025-08-04 13:20:47,807] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=6.0 | Drone dn4 still in transit with package pkg7
-[2025-08-04 13:20:47,807] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=6.0 | Drone dn1 still in transit with package pkg4
-[2025-08-04 13:20:47,807] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=6.0 | Drone dn2 still in transit with package pkg3
-[2025-08-04 13:20:47,807] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=6.0 | Drone dn3 still in transit with package pkg1
-[2025-08-04 13:20:47,807] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=6.0 | Drone dn5 still in transit with package pkg8
-[2025-08-04 13:20:47,807] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,807] INFO:[t=6.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,807] DEBUG:[Time Step] Advancing to t=6.0
-[2025-08-04 13:20:47,807] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=7.0 | Drone dn4 still in transit with package pkg7
-[2025-08-04 13:20:47,807] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=7.0 | Drone dn1 still in transit with package pkg4
-[2025-08-04 13:20:47,807] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=7.0 | Drone dn2 still in transit with package pkg3
-[2025-08-04 13:20:47,807] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=7.0 | Drone dn3 still in transit with package pkg1
-[2025-08-04 13:20:47,807] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=7.0 | Drone dn5 still in transit with package pkg8
-[2025-08-04 13:20:47,807] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,807] INFO:[t=7.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,807] DEBUG:[Time Step] Advancing to t=7.0
-[2025-08-04 13:20:47,807] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,807] DEBUG:[In Transit] t=8.0 | Drone dn4 still in transit with package pkg7
-[2025-08-04 13:20:47,807] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,807] INFO:[Delivery] t=8.0 | Drone dn1 delivered pkg pkg4 on time
-[2025-08-04 13:20:47,807] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.77297376531437), lon=np.float64(-122.48100030583758)), time_window=(np.float64(8.0), np.float64(16.0)), approx_travel_times={})
-[2025-08-04 13:20:47,807] DEBUG:[Delivery] t=8.0 | Drone dn1 delivered pkg pkg4 at 8.00, deadline=16.00, on_time=True
-[2025-08-04 13:20:47,807] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,807] INFO:[Delivery] t=8.0 | Drone dn2 delivered pkg pkg3 on time
-[2025-08-04 13:20:47,807] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.779804506686716), lon=np.float64(-122.49454760697658)), time_window=(np.float64(8.0), np.float64(15.0)), approx_travel_times={})
-[2025-08-04 13:20:47,807] DEBUG:[Delivery] t=8.0 | Drone dn2 delivered pkg pkg3 at 8.00, deadline=15.00, on_time=True
-[2025-08-04 13:20:47,807] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,807] INFO:[Delivery] t=8.0 | Drone dn3 delivered pkg pkg1 on time
-[2025-08-04 13:20:47,807] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.76397890927038), lon=np.float64(-122.47551909649188)), time_window=(np.float64(8.0), np.float64(18.0)), approx_travel_times={})
-[2025-08-04 13:20:47,807] DEBUG:[Delivery] t=8.0 | Drone dn3 delivered pkg pkg1 at 8.00, deadline=18.00, on_time=True
-[2025-08-04 13:20:47,807] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
-[2025-08-04 13:20:47,807] INFO:[Delivery] t=8.0 | Drone dn5 delivered pkg pkg8 on time
-[2025-08-04 13:20:47,807] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.746419003082046), lon=np.float64(-122.40830060980026)), time_window=(np.float64(8.0), np.float64(14.0)), approx_travel_times={})
-[2025-08-04 13:20:47,807] DEBUG:[Delivery] t=8.0 | Drone dn5 delivered pkg pkg8 at 8.00, deadline=14.00, on_time=True
-[2025-08-04 13:20:47,807] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,807] INFO:[t=8.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,807] DEBUG:[Time Step] Advancing to t=8.0
-[2025-08-04 13:20:47,807] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,807] INFO:[Delivery] t=9.0 | Drone dn4 delivered pkg pkg7 on time
-[2025-08-04 13:20:47,807] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.78617584084239), lon=np.float64(-122.39642928745718)), time_window=(np.float64(7.0), np.float64(15.0)), approx_travel_times={})
-[2025-08-04 13:20:47,807] DEBUG:[Delivery] t=9.0 | Drone dn4 delivered pkg pkg7 at 9.00, deadline=15.00, on_time=True
-[2025-08-04 13:20:47,807] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,807] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,807] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,807] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
-[2025-08-04 13:20:47,808] DEBUG:[Return] t=9.0 | Drone dn5 returned after delivering pkg8 at ret=9.00
-[2025-08-04 13:20:47,808] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,808] DEBUG:[SCoBA] Drone dn5 has 2 interaction events. Using max 20
-[2025-08-04 13:20:47,808] INFO:[UtilCheck] Task first time pkg2 → util=8.07
-[2025-08-04 13:20:47,808] INFO:[Debug] pkg branch: attempt util=8.07, skip util=4.03
-[2025-08-04 13:20:47,808] INFO:[Coord] Total conflicts this round: 0
-[2025-08-04 13:20:47,808] DEBUG:No more conflicts; returning allocation.
-[2025-08-04 13:20:47,808] INFO:[SCoBA] Unused drones at t=9.0: []
-[2025-08-04 13:20:47,808] INFO:[INFO] SCoBA assigned 1 drones at t=9.0
-[2025-08-04 13:20:47,808] INFO:[t=9.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,808] DEBUG:[Time Step] Advancing to t=9.0
-[2025-08-04 13:20:47,808] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,808] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
-[2025-08-04 13:20:47,808] DEBUG:[Return] t=10.0 | Drone dn1 returned after delivering pkg4 at ret=10.00
-[2025-08-04 13:20:47,808] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,808] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,808] INFO:Drone dn5 has package pkg2 with true delivery 10 and return 11, the window is (np.float64(8.0), np.float64(17.0), 19)
-[2025-08-04 13:20:47,808] INFO:[Delivery] t=10.0 | Drone dn5 delivered pkg pkg2 on time
-[2025-08-04 13:20:47,808] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.74793880573911), lon=np.float64(-122.41549362388074)), time_window=(np.float64(8.0), np.float64(17.0)), approx_travel_times={})
-[2025-08-04 13:20:47,808] DEBUG:[Delivery] t=10.0 | Drone dn5 delivered pkg pkg2 at 10.00, deadline=17.00, on_time=True
-[2025-08-04 13:20:47,808] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,808] DEBUG:[SCoBA] Drone dn1 has 1 interaction events. Using max 20
-[2025-08-04 13:20:47,808] INFO:[UtilCheck] Task first time pkg5 → util=8.07
-[2025-08-04 13:20:47,808] INFO:[Debug] pkg branch: attempt util=8.07, skip util=0.00
-[2025-08-04 13:20:47,808] INFO:[Coord] Total conflicts this round: 0
-[2025-08-04 13:20:47,808] DEBUG:No more conflicts; returning allocation.
-[2025-08-04 13:20:47,808] INFO:[SCoBA] Unused drones at t=10.0: []
-[2025-08-04 13:20:47,808] INFO:[INFO] SCoBA assigned 1 drones at t=10.0
-[2025-08-04 13:20:47,808] INFO:[t=10.0] SCoBA assignment finished with 5 total assignments.
-[2025-08-04 13:20:47,808] DEBUG:[Time Step] Advancing to t=10.0
-[2025-08-04 13:20:47,808] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,808] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,808] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
-[2025-08-04 13:20:47,808] DEBUG:[Return] t=11.0 | Drone dn3 returned after delivering pkg1 at ret=11.00
-[2025-08-04 13:20:47,808] INFO:Drone dn5 has package pkg2 with true delivery 10 and return 11, the window is (np.float64(8.0), np.float64(17.0), 19)
-[2025-08-04 13:20:47,808] DEBUG:[Return] t=11.0 | Drone dn5 returned after delivering pkg2 at ret=11.00
-[2025-08-04 13:20:47,808] INFO:Drone dn1 has package pkg5 with true delivery 11 and return 12, the window is (np.float64(10.0), np.float64(19.0), 20)
-[2025-08-04 13:20:47,808] INFO:[Delivery] t=11.0 | Drone dn1 delivered pkg pkg5 on time
-[2025-08-04 13:20:47,809] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.77310115152999), lon=np.float64(-122.46926442558446)), time_window=(np.float64(10.0), np.float64(19.0)), approx_travel_times={})
-[2025-08-04 13:20:47,809] DEBUG:[Delivery] t=11.0 | Drone dn1 delivered pkg pkg5 at 11.00, deadline=19.00, on_time=True
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Updated drone locations: 5 drones
-[2025-08-04 13:20:47,809] DEBUG:[SCoBA] Drone dn5 has 1 interaction events. Using max 20
-[2025-08-04 13:20:47,809] INFO:[UtilCheck] Task first time pkg6 → util=8.07
-[2025-08-04 13:20:47,809] INFO:[Debug] pkg branch: attempt util=2.28, skip util=0.00
-[2025-08-04 13:20:47,809] INFO:[Coord] Total conflicts this round: 0
-[2025-08-04 13:20:47,809] DEBUG:No more conflicts; returning allocation.
-[2025-08-04 13:20:47,809] INFO:[SCoBA] Unused drones at t=11.0: []
-[2025-08-04 13:20:47,809] INFO:[INFO] SCoBA assigned 1 drones at t=11.0
-[2025-08-04 13:20:47,809] INFO:[t=11.0] SCoBA assignment finished with 4 total assignments.
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Advancing to t=11.0
-[2025-08-04 13:20:47,809] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,809] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
-[2025-08-04 13:20:47,809] DEBUG:[Return] t=12.0 | Drone dn2 returned after delivering pkg3 at ret=12.00
-[2025-08-04 13:20:47,809] INFO:Drone dn1 has package pkg5 with true delivery 11 and return 12, the window is (np.float64(10.0), np.float64(19.0), 20)
-[2025-08-04 13:20:47,809] DEBUG:[Return] t=12.0 | Drone dn1 returned after delivering pkg5 at ret=12.00
-[2025-08-04 13:20:47,809] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,809] DEBUG:[In Transit] t=12.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Updated drone locations: 4 drones
-[2025-08-04 13:20:47,809] INFO:[t=12.0] SCoBA assignment finished with 2 total assignments.
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Advancing to t=12.0
-[2025-08-04 13:20:47,809] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,809] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,809] DEBUG:[In Transit] t=13.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Updated drone locations: 2 drones
-[2025-08-04 13:20:47,809] INFO:[t=13.0] SCoBA assignment finished with 2 total assignments.
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Advancing to t=13.0
-[2025-08-04 13:20:47,809] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,809] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,809] DEBUG:[In Transit] t=14.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Updated drone locations: 2 drones
-[2025-08-04 13:20:47,809] INFO:[t=14.0] SCoBA assignment finished with 2 total assignments.
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Advancing to t=14.0
-[2025-08-04 13:20:47,809] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,809] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,809] DEBUG:[In Transit] t=15.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Updated drone locations: 2 drones
-[2025-08-04 13:20:47,809] INFO:[t=15.0] SCoBA assignment finished with 2 total assignments.
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Advancing to t=15.0
-[2025-08-04 13:20:47,809] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,809] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,809] DEBUG:[In Transit] t=16.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,809] DEBUG:[Time Step] Updated drone locations: 2 drones
-[2025-08-04 13:20:47,810] INFO:[t=16.0] SCoBA assignment finished with 2 total assignments.
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Advancing to t=16.0
-[2025-08-04 13:20:47,810] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,810] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,810] DEBUG:[In Transit] t=17.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Updated drone locations: 2 drones
-[2025-08-04 13:20:47,810] INFO:[t=17.0] SCoBA assignment finished with 2 total assignments.
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Advancing to t=17.0
-[2025-08-04 13:20:47,810] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
-[2025-08-04 13:20:47,810] DEBUG:[Return] t=18.0 | Drone dn4 returned after delivering pkg7 at ret=18.00
-[2025-08-04 13:20:47,810] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,810] DEBUG:[In Transit] t=18.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Updated drone locations: 2 drones
-[2025-08-04 13:20:47,810] INFO:[t=18.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Advancing to t=18.0
-[2025-08-04 13:20:47,810] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,810] DEBUG:[In Transit] t=19.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,810] INFO:[t=19.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Advancing to t=19.0
-[2025-08-04 13:20:47,810] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,810] DEBUG:[In Transit] t=20.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,810] INFO:[t=20.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Advancing to t=20.0
-[2025-08-04 13:20:47,810] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,810] DEBUG:[In Transit] t=21.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,810] INFO:[t=21.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Advancing to t=21.0
-[2025-08-04 13:20:47,810] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,810] DEBUG:[In Transit] t=22.0 | Drone dn5 still in transit with package pkg6
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,810] INFO:[t=22.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Advancing to t=22.0
-[2025-08-04 13:20:47,810] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,810] INFO:[Delivery] t=23.0 | Drone dn5 delivered pkg pkg6 late
-[2025-08-04 13:20:47,810] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.71560464297584), lon=np.float64(-122.4048093933317)), time_window=(np.float64(9.0), np.float64(18.0)), approx_travel_times={})
-[2025-08-04 13:20:47,810] DEBUG:[Delivery] t=23.0 | Drone dn5 delivered pkg pkg6 at 23.00, deadline=18.00, on_time=False
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,810] INFO:[t=23.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Advancing to t=23.0
-[2025-08-04 13:20:47,810] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,810] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,811] INFO:[t=24.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Advancing to t=24.0
-[2025-08-04 13:20:47,811] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,811] INFO:[t=25.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Advancing to t=25.0
-[2025-08-04 13:20:47,811] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,811] INFO:[t=26.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Advancing to t=26.0
-[2025-08-04 13:20:47,811] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,811] INFO:[t=27.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Advancing to t=27.0
-[2025-08-04 13:20:47,811] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,811] INFO:[t=28.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Advancing to t=28.0
-[2025-08-04 13:20:47,811] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Updated drone locations: 1 drones
-[2025-08-04 13:20:47,811] INFO:[t=29.0] SCoBA assignment finished with 1 total assignments.
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Advancing to t=29.0
-[2025-08-04 13:20:47,811] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
-[2025-08-04 13:20:47,811] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:56,645] INFO:dr5_dep2_probpt05_win10_scoba.json
+[2025-08-07 10:22:56,646] INFO:Running scoba baseline for 1 trials.
+[2025-08-07 10:22:57,012] DEBUG:[SCoBA] Drone dn1 has 4 interaction events. Using max 20
+[2025-08-07 10:22:57,012] INFO:[UtilCheck] Task first time pkg4 → util=8.07
+[2025-08-07 10:22:57,012] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
+[2025-08-07 10:22:57,012] DEBUG:[SCoBA] Drone dn2 has 4 interaction events. Using max 20
+[2025-08-07 10:22:57,012] INFO:[UtilCheck] Task first time pkg4 → util=8.07
+[2025-08-07 10:22:57,012] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
+[2025-08-07 10:22:57,012] DEBUG:[SCoBA] Drone dn3 has 4 interaction events. Using max 20
+[2025-08-07 10:22:57,012] INFO:[UtilCheck] Task first time pkg4 → util=8.07
+[2025-08-07 10:22:57,012] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
+[2025-08-07 10:22:57,012] DEBUG:[SCoBA] Drone dn4 has 4 interaction events. Using max 20
+[2025-08-07 10:22:57,012] INFO:[UtilCheck] Task first time pkg8 → util=8.07
+[2025-08-07 10:22:57,013] INFO:[UtilCheck] Task first time pkg7 → util=8.07
+[2025-08-07 10:22:57,013] INFO:[Debug] pkg branch: attempt util=8.00, skip util=5.78
+[2025-08-07 10:22:57,013] DEBUG:[SCoBA] Drone dn5 has 3 interaction events. Using max 20
+[2025-08-07 10:22:57,013] INFO:[UtilCheck] Task first time pkg8 → util=8.07
+[2025-08-07 10:22:57,013] INFO:[Debug] pkg branch: attempt util=8.07, skip util=7.48
+[2025-08-07 10:22:57,013] INFO:[Coord] Total conflicts this round: 0
+[2025-08-07 10:22:57,013] DEBUG:No more conflicts; returning allocation.
+[2025-08-07 10:22:57,013] INFO:[SCoBA] Unused drones at t=0.0: []
+[2025-08-07 10:22:57,013] INFO:[INFO] SCoBA assigned 1 drones at t=0.0
+[2025-08-07 10:22:57,013] INFO:[t=0.0] SCoBA assignment finished with 1 total assignments.
+[2025-08-07 10:22:57,013] DEBUG:[Time Step] Advancing to t=0.0
+[2025-08-07 10:22:57,013] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,013] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,014] DEBUG:[SCoBA] Drone dn1 has 4 interaction events. Using max 20
+[2025-08-07 10:22:57,014] INFO:[UtilCheck] Task first time pkg4 → util=8.07
+[2025-08-07 10:22:57,014] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
+[2025-08-07 10:22:57,014] DEBUG:[SCoBA] Drone dn2 has 3 interaction events. Using max 20
+[2025-08-07 10:22:57,014] INFO:[UtilCheck] Task first time pkg3 → util=8.07
+[2025-08-07 10:22:57,014] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
+[2025-08-07 10:22:57,014] DEBUG:[SCoBA] Drone dn3 has 2 interaction events. Using max 20
+[2025-08-07 10:22:57,014] INFO:[UtilCheck] Task first time pkg5 → util=8.07
+[2025-08-07 10:22:57,014] INFO:[UtilCheck] Task first time pkg1 → util=8.07
+[2025-08-07 10:22:57,014] INFO:[Debug] pkg branch: attempt util=8.07, skip util=0.00
+[2025-08-07 10:22:57,014] DEBUG:[SCoBA] Drone dn5 has 3 interaction events. Using max 20
+[2025-08-07 10:22:57,014] INFO:[UtilCheck] Task first time pkg8 → util=8.07
+[2025-08-07 10:22:57,014] INFO:[Debug] pkg branch: attempt util=8.07, skip util=8.07
+[2025-08-07 10:22:57,014] INFO:[Coord] Total conflicts this round: 0
+[2025-08-07 10:22:57,014] DEBUG:No more conflicts; returning allocation.
+[2025-08-07 10:22:57,014] INFO:[SCoBA] Unused drones at t=1.0: []
+[2025-08-07 10:22:57,015] INFO:[INFO] SCoBA assigned 4 drones at t=1.0
+[2025-08-07 10:22:57,015] INFO:[t=1.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,015] DEBUG:[Time Step] Advancing to t=1.0
+[2025-08-07 10:22:57,015] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,015] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,015] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,015] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,015] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
+[2025-08-07 10:22:57,015] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,015] INFO:[t=2.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,015] DEBUG:[Time Step] Advancing to t=2.0
+[2025-08-07 10:22:57,015] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,015] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,015] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,015] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,015] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
+[2025-08-07 10:22:57,015] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,015] INFO:[t=3.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,015] DEBUG:[Time Step] Advancing to t=3.0
+[2025-08-07 10:22:57,015] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,015] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,015] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,015] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,015] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
+[2025-08-07 10:22:57,015] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,015] INFO:[t=4.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,015] DEBUG:[Time Step] Advancing to t=4.0
+[2025-08-07 10:22:57,015] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,015] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,015] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,015] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,015] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
+[2025-08-07 10:22:57,015] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,016] INFO:[t=5.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,016] DEBUG:[Time Step] Advancing to t=5.0
+[2025-08-07 10:22:57,016] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,016] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,016] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,016] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,016] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
+[2025-08-07 10:22:57,016] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,016] INFO:[t=6.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,016] DEBUG:[Time Step] Advancing to t=6.0
+[2025-08-07 10:22:57,016] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,016] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,016] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,016] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,016] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
+[2025-08-07 10:22:57,016] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,016] INFO:[t=7.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,016] DEBUG:[Time Step] Advancing to t=7.0
+[2025-08-07 10:22:57,016] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,016] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,016] INFO:[Delivery] t=8.0 | Drone dn1 delivered pkg pkg4 on time
+[2025-08-07 10:22:57,016] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.77297376531437), lon=np.float64(-122.48100030583758)), time_window=(np.float64(8.0), np.float64(16.0)), approx_travel_times={})
+[2025-08-07 10:22:57,016] DEBUG:[Delivery] t=8.0 | Drone dn1 delivered pkg pkg4 at 8.00, deadline=16.00, on_time=True
+[2025-08-07 10:22:57,016] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,016] INFO:[Delivery] t=8.0 | Drone dn2 delivered pkg pkg3 on time
+[2025-08-07 10:22:57,016] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.779804506686716), lon=np.float64(-122.49454760697658)), time_window=(np.float64(8.0), np.float64(15.0)), approx_travel_times={})
+[2025-08-07 10:22:57,016] DEBUG:[Delivery] t=8.0 | Drone dn2 delivered pkg pkg3 at 8.00, deadline=15.00, on_time=True
+[2025-08-07 10:22:57,016] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,016] INFO:[Delivery] t=8.0 | Drone dn3 delivered pkg pkg1 on time
+[2025-08-07 10:22:57,016] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.76397890927038), lon=np.float64(-122.47551909649188)), time_window=(np.float64(8.0), np.float64(18.0)), approx_travel_times={})
+[2025-08-07 10:22:57,016] DEBUG:[Delivery] t=8.0 | Drone dn3 delivered pkg pkg1 at 8.00, deadline=18.00, on_time=True
+[2025-08-07 10:22:57,016] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
+[2025-08-07 10:22:57,016] INFO:[Delivery] t=8.0 | Drone dn5 delivered pkg pkg8 on time
+[2025-08-07 10:22:57,016] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.746419003082046), lon=np.float64(-122.40830060980026)), time_window=(np.float64(8.0), np.float64(14.0)), approx_travel_times={})
+[2025-08-07 10:22:57,016] DEBUG:[Delivery] t=8.0 | Drone dn5 delivered pkg pkg8 at 8.00, deadline=14.00, on_time=True
+[2025-08-07 10:22:57,017] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,017] INFO:[t=8.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,017] DEBUG:[Time Step] Advancing to t=8.0
+[2025-08-07 10:22:57,017] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,017] INFO:[Delivery] t=9.0 | Drone dn4 delivered pkg pkg7 on time
+[2025-08-07 10:22:57,017] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.78617584084239), lon=np.float64(-122.39642928745718)), time_window=(np.float64(7.0), np.float64(15.0)), approx_travel_times={})
+[2025-08-07 10:22:57,017] DEBUG:[Delivery] t=9.0 | Drone dn4 delivered pkg pkg7 at 9.00, deadline=15.00, on_time=True
+[2025-08-07 10:22:57,017] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,017] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,017] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,017] INFO:Drone dn5 has package pkg8 with true delivery 8.0 and return 9.0, the window is (np.float64(8.0), np.float64(14.0), 16)
+[2025-08-07 10:22:57,017] DEBUG:[Return] t=9.0 | Drone dn5 returned after delivering pkg8 at ret=9.00
+[2025-08-07 10:22:57,017] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,017] DEBUG:[SCoBA] Drone dn5 has 2 interaction events. Using max 20
+[2025-08-07 10:22:57,017] INFO:[UtilCheck] Task first time pkg2 → util=8.07
+[2025-08-07 10:22:57,017] INFO:[Debug] pkg branch: attempt util=8.07, skip util=4.03
+[2025-08-07 10:22:57,017] INFO:[Coord] Total conflicts this round: 0
+[2025-08-07 10:22:57,017] DEBUG:No more conflicts; returning allocation.
+[2025-08-07 10:22:57,017] INFO:[SCoBA] Unused drones at t=9.0: []
+[2025-08-07 10:22:57,017] INFO:[INFO] SCoBA assigned 1 drones at t=9.0
+[2025-08-07 10:22:57,017] INFO:[t=9.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,017] DEBUG:[Time Step] Advancing to t=9.0
+[2025-08-07 10:22:57,017] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,017] INFO:Drone dn1 has package pkg4 with true delivery 8.0 and return 10.0, the window is (np.float64(8.0), np.float64(16.0), 18)
+[2025-08-07 10:22:57,017] DEBUG:[Return] t=10.0 | Drone dn1 returned after delivering pkg4 at ret=10.00
+[2025-08-07 10:22:57,017] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,017] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,017] INFO:Drone dn5 has package pkg2 with true delivery 10 and return 11, the window is (np.float64(8.0), np.float64(17.0), 19)
+[2025-08-07 10:22:57,017] INFO:[Delivery] t=10.0 | Drone dn5 delivered pkg pkg2 on time
+[2025-08-07 10:22:57,018] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.74793880573911), lon=np.float64(-122.41549362388074)), time_window=(np.float64(8.0), np.float64(17.0)), approx_travel_times={})
+[2025-08-07 10:22:57,018] DEBUG:[Delivery] t=10.0 | Drone dn5 delivered pkg pkg2 at 10.00, deadline=17.00, on_time=True
+[2025-08-07 10:22:57,018] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,018] DEBUG:[SCoBA] Drone dn1 has 1 interaction events. Using max 20
+[2025-08-07 10:22:57,018] INFO:[UtilCheck] Task first time pkg5 → util=8.07
+[2025-08-07 10:22:57,018] INFO:[Debug] pkg branch: attempt util=8.07, skip util=0.00
+[2025-08-07 10:22:57,018] INFO:[Coord] Total conflicts this round: 0
+[2025-08-07 10:22:57,018] DEBUG:No more conflicts; returning allocation.
+[2025-08-07 10:22:57,018] INFO:[SCoBA] Unused drones at t=10.0: []
+[2025-08-07 10:22:57,018] INFO:[INFO] SCoBA assigned 1 drones at t=10.0
+[2025-08-07 10:22:57,018] INFO:[t=10.0] SCoBA assignment finished with 5 total assignments.
+[2025-08-07 10:22:57,018] DEBUG:[Time Step] Advancing to t=10.0
+[2025-08-07 10:22:57,018] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,018] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,018] INFO:Drone dn3 has package pkg1 with true delivery 8.0 and return 11.0, the window is (np.float64(8.0), np.float64(18.0), 21)
+[2025-08-07 10:22:57,018] DEBUG:[Return] t=11.0 | Drone dn3 returned after delivering pkg1 at ret=11.00
+[2025-08-07 10:22:57,018] INFO:Drone dn5 has package pkg2 with true delivery 10 and return 11, the window is (np.float64(8.0), np.float64(17.0), 19)
+[2025-08-07 10:22:57,018] DEBUG:[Return] t=11.0 | Drone dn5 returned after delivering pkg2 at ret=11.00
+[2025-08-07 10:22:57,018] INFO:Drone dn1 has package pkg5 with true delivery 11 and return 12, the window is (np.float64(10.0), np.float64(19.0), 20)
+[2025-08-07 10:22:57,018] INFO:[Delivery] t=11.0 | Drone dn1 delivered pkg pkg5 on time
+[2025-08-07 10:22:57,018] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.77310115152999), lon=np.float64(-122.46926442558446)), time_window=(np.float64(10.0), np.float64(19.0)), approx_travel_times={})
+[2025-08-07 10:22:57,018] DEBUG:[Delivery] t=11.0 | Drone dn1 delivered pkg pkg5 at 11.00, deadline=19.00, on_time=True
+[2025-08-07 10:22:57,018] DEBUG:[Time Step] Updated drone locations: 5 drones
+[2025-08-07 10:22:57,018] DEBUG:[SCoBA] Drone dn5 has 1 interaction events. Using max 20
+[2025-08-07 10:22:57,018] INFO:[UtilCheck] Task first time pkg6 → util=8.07
+[2025-08-07 10:22:57,019] INFO:[Debug] pkg branch: attempt util=2.28, skip util=0.00
+[2025-08-07 10:22:57,019] INFO:[Coord] Total conflicts this round: 0
+[2025-08-07 10:22:57,019] DEBUG:No more conflicts; returning allocation.
+[2025-08-07 10:22:57,019] INFO:[SCoBA] Unused drones at t=11.0: []
+[2025-08-07 10:22:57,019] INFO:[INFO] SCoBA assigned 1 drones at t=11.0
+[2025-08-07 10:22:57,019] INFO:[t=11.0] SCoBA assignment finished with 4 total assignments.
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Advancing to t=11.0
+[2025-08-07 10:22:57,019] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,019] INFO:Drone dn2 has package pkg3 with true delivery 8.0 and return 12.0, the window is (np.float64(8.0), np.float64(15.0), 20)
+[2025-08-07 10:22:57,019] DEBUG:[Return] t=12.0 | Drone dn2 returned after delivering pkg3 at ret=12.00
+[2025-08-07 10:22:57,019] INFO:Drone dn1 has package pkg5 with true delivery 11 and return 12, the window is (np.float64(10.0), np.float64(19.0), 20)
+[2025-08-07 10:22:57,019] DEBUG:[Return] t=12.0 | Drone dn1 returned after delivering pkg5 at ret=12.00
+[2025-08-07 10:22:57,019] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Updated drone locations: 4 drones
+[2025-08-07 10:22:57,019] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Advancing to t=12.0
+[2025-08-07 10:22:57,019] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,019] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Updated drone locations: 2 drones
+[2025-08-07 10:22:57,019] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Advancing to t=13.0
+[2025-08-07 10:22:57,019] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,019] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Updated drone locations: 2 drones
+[2025-08-07 10:22:57,019] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Advancing to t=14.0
+[2025-08-07 10:22:57,019] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,019] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Updated drone locations: 2 drones
+[2025-08-07 10:22:57,019] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Advancing to t=15.0
+[2025-08-07 10:22:57,019] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,019] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Updated drone locations: 2 drones
+[2025-08-07 10:22:57,019] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,019] DEBUG:[Time Step] Advancing to t=16.0
+[2025-08-07 10:22:57,020] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 2 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=17.0
+[2025-08-07 10:22:57,020] INFO:Drone dn4 has package pkg7 with true delivery 9 and return 18, the window is (np.float64(7.0), np.float64(15.0), 24)
+[2025-08-07 10:22:57,020] DEBUG:[Return] t=18.0 | Drone dn4 returned after delivering pkg7 at ret=18.00
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 2 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=18.0
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=19.0
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=20.0
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=21.0
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=22.0
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] INFO:[Delivery] t=23.0 | Drone dn5 delivered pkg pkg6 late
+[2025-08-07 10:22:57,020] DEBUG:sim done packagesPackage(delivery=LatLonCoords(lat=np.float64(37.71560464297584), lon=np.float64(-122.4048093933317)), time_window=(np.float64(9.0), np.float64(18.0)), approx_travel_times={})
+[2025-08-07 10:22:57,020] DEBUG:[Delivery] t=23.0 | Drone dn5 delivered pkg pkg6 at 23.00, deadline=18.00, on_time=False
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=23.0
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=24.0
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,020] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,020] DEBUG:[Time Step] Advancing to t=25.0
+[2025-08-07 10:22:57,020] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=26.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=27.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=28.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=29.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=30.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=31.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=32.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=33.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=34.0
+[2025-08-07 10:22:57,021] INFO:Drone dn5 has package pkg6 with true delivery 23 and return 35, the window is (np.float64(9.0), np.float64(18.0), 27)
+[2025-08-07 10:22:57,021] DEBUG:[Return] t=35.0 | Drone dn5 returned after delivering pkg6 at ret=35.00
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 1 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=35.0
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Updated drone locations: 0 drones
+[2025-08-07 10:22:57,021] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,021] DEBUG:[Time Step] Advancing to t=36.0
+[2025-08-07 10:22:57,022] DEBUG:[Time Step] Updated drone locations: 0 drones
+[2025-08-07 10:22:57,022] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,022] DEBUG:[Time Step] Advancing to t=37.0
+[2025-08-07 10:22:57,022] DEBUG:[Time Step] Updated drone locations: 0 drones
+[2025-08-07 10:22:57,022] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,022] DEBUG:[Time Step] Advancing to t=38.0
+[2025-08-07 10:22:57,022] DEBUG:[Time Step] Updated drone locations: 0 drones
+[2025-08-07 10:22:57,022] INFO:No active packages available. Skipping assignment.
+[2025-08-07 10:22:57,022] DEBUG:[Time Step] Advancing to t=39.0
+[2025-08-07 10:22:57,022] DEBUG:[Time Step] Updated drone locations: 0 drones

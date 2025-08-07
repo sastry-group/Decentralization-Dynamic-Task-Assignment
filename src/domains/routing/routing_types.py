@@ -105,5 +105,6 @@ class RoutingSimulator:
     tt_est_std_scale: float             = 3.0
     distance_thresh: float              = 5.0 # kilometers
     curr_drone_site_locs: CurrDroneSiteLocs = field(default_factory=CurrDroneSiteLocs)
+    depot_locs: Dict[str, LatLonCoords] = field(default_factory=dict)
 
 

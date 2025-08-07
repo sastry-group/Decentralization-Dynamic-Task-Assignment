@@ -148,6 +148,7 @@ def setup_routing_sim(params_fn: str,
     active_packages = {}
     for n in range(1, num_init_requests+1):
         name = f"pkg{n}"
+        # improve this to get te eactual distance_threshh
         pkg = generate_package_request(name, lat_dist, lon_dist, 0.0, time_window_duration, rng, depot_locs=depot_locs, dist_thresh=5 ,csv_logger=csv_logger)
         active_packages[name] = pkg
 
@@ -164,7 +165,8 @@ def setup_routing_sim(params_fn: str,
         active_packages=active_packages,
         num_total_packages=num_init_requests,
         num_active_packages=num_init_requests,
-        in_transit_packages=in_transit_packages
+        in_transit_packages=in_transit_packages,
+        depot_locs=depot_locs if depot_locs else {},
     )
 
 
@@ -195,6 +197,7 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
         # triggering only if deliveries are happening in this time step
         # For pickup, assign package to drone and mark package inactive
         if old_time < delivery <= sim.current_time:
+            # print("Checking, sim time", sim.current_time, "delivery time", delivery)
             dp = server.agent_prop_set[dn]
             dp.current_package = ""
             dp.at_depot = False  
@@ -219,14 +222,14 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
                     "drone_id": dn,
                     "pkg_id": pkg,
                     "actual_delivery_time": delivery,
-                    "on_time": on_time,
                     "deadline": sim.busy_packages[pkg].time_window[1],
+                    "on_time": on_time,
                     # "window_start": pkg_window[0],
                     # "window_success": pkg_window[2],
-                    "depot_lat": server.agent_set[dn].depot_loc.lat,
-                    "depot_lon": server.agent_set[dn].depot_loc.lon,
-                    "delivery_lat": sim.busy_packages[pkg].delivery.lat,
-                    "delivery_lon": sim.busy_packages[pkg].delivery.lon,
+                    # "depot_lat": server.agent_set[dn].depot_loc.lat,
+                    # "depot_lon": server.agent_set[dn].depot_loc.lon,
+                    # "delivery_lat": sim.busy_packages[pkg].delivery.lat,
+                    # "delivery_lon": sim.busy_packages[pkg].delivery.lon,
                 })
 
             sim.done_packages[pkg] = Package(
@@ -248,8 +251,9 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
             logging.debug(f"[Return] t={sim.current_time} | Drone {dn} returned after delivering {pkg} at ret={ret:.2f}")
         else:
             # if pkg in sim.busy_packages or pkg in sim.done_packages:
-            if pkg in sim.busy_packages:
-                logging.debug(f"[In Transit] t={sim.current_time} | Drone {dn} still in transit with package {pkg}")
+            if pkg not in sim.busy_packages and pkg not in sim.done_packages:
+                logging.warning(f"[t={sim.current_time}] Package {pkg} not found in busy or done — skipping.")
+                continue
             depot = server.agent_set[dn].depot_loc
             
             if sim.current_time < delivery:
@@ -259,10 +263,18 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
                 new_lat = depot.lat + (1 - interp_factor) * (pp_loc.lat - depot.lat)
                 new_lon = depot.lon + (1 - interp_factor) * (pp_loc.lon - depot.lon)
             else:
+                if pkg not in sim.done_packages:
+                    logging.warning(f"[t={sim.current_time}] Package {pkg} not found in done_packages — skipping.")
+                    continue
+
                 pp_loc = sim.done_packages[pkg].delivery
-                interp_factor = (ret - sim.current_time)/(ret - delivery)
-                new_lat = depot.lat + (interp_factor)*(pp_loc.lat - depot.lat)
-                new_lon = depot.lon + (interp_factor)*(pp_loc.lon - depot.lon)
+                interp_factor = (ret - sim.current_time) / (ret - delivery)
+                new_lat = depot.lat + interp_factor * (pp_loc.lat - depot.lat)
+                new_lon = depot.lon + interp_factor * (pp_loc.lon - depot.lon)
+                # pp_loc = sim.done_packages[pkg].delivery
+                # interp_factor = (ret - sim.current_time)/(ret - delivery)
+                # new_lat = depot.lat + (interp_factor)*(pp_loc.lat - depot.lat)
+                # new_lon = depot.lon + (interp_factor)*(pp_loc.lon - depot.lon)
 
             drone_locs.append((LatLonCoords(lat=new_lat, lon=new_lon), 'blue'))
 
@@ -295,6 +307,8 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
     #         sim.current_time,
     #         sim.time_window_duration,
     #         rng,
+    #         depot_locs=sim.depot_locs, 
+    #         dist_thresh= sim.distance_thresh,
     #         csv_logger=csv_logger
     #     )
     #     # logging.info(f"New package request generated: {pkg}")

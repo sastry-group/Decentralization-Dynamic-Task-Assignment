@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 # Configurable params
 probs = [0.5]
-algos = ["scoba", "edd"]
-colors = {"scoba": "#1f77b4", "edd": "#ff7f0e"}  # Optional: custom hex colors
+algos = ["scoba", "edd", "ibr"]
+colors = {"scoba": "#1f77b4", "edd": "#ff7f0e", "ibr": "#2ca02c"}  # Optional: custom hex colors
 base_dir = "results/logs"
 
 # Initialize result holders
@@ -15,7 +15,7 @@ mean_late = {a: [] for a in algos}
 sem_late = {a: [] for a in algos}
 
 # Extract n_drones and n_depots from sample file
-sample_folder = f"scoba_dr15_dep5_probpt{str(probs[0]).replace('.','')}_win30_{algos[0]}"
+sample_folder = f"dr5_dep2_probpt{str(probs[0]).replace('.','')}_win10_{algos[0]}"
 sample_fn = os.path.join(base_dir, sample_folder, f"{sample_folder}.json")
 m = re.search(r"dr(\d+)_dep(\d+)", sample_fn)
 n_drones, n_depots = m.groups() if m else ("?", "?")
@@ -24,7 +24,7 @@ n_drones, n_depots = m.groups() if m else ("?", "?")
 for a in algos:
     for p in probs:
         prob_str = str(p).replace('.', '')
-        folder = f"scoba_dr{n_drones}_dep{n_depots}_probpt{prob_str}_win30_{a}"
+        folder = f"dr{n_drones}_dep{n_depots}_probpt{prob_str}_win10_{a}"
         filepath = os.path.join(base_dir, folder, f"{folder}.json")
         if not os.path.exists(filepath):
             print(f"Warning: File not found: {filepath}")
@@ -63,4 +63,5 @@ ax.legend()
 plt.title(f"{n_drones} drones, {n_depots} depots")
 
 plt.tight_layout()
+plt.savefig("results/frac_late_vs_new_request.png")
 plt.show()

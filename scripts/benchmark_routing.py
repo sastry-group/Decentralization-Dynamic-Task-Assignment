@@ -62,7 +62,8 @@ from domains.routing.mcts import (
 )
 
 
-from domains.routing.routing_scoba     import scoba_routing
+from domains.routing.routing_scoba import scoba_routing
+from domains.routing.routing_ibr import iterative_best_response
 from solver.scoba_types                 import GenericAllocation as RoutingAllocation
 from solver.scoba_types import SearchTree
 
@@ -83,7 +84,7 @@ def parse_commandline():
     p.add_argument('--time_window',      type=float, required=True)
     p.add_argument('--timesteps',        type=int,   required=True)
     p.add_argument('--baseline',
-                   choices=['mcts','edd','hungarian','scoba'],
+                   choices=['mcts','edd','hungarian','scoba', 'ibr'],
                    required=True)
     p.add_argument('out_file_name',      type=str)
     return vars(p.parse_args())
@@ -222,9 +223,12 @@ def main():
         # Baselines
         if args['baseline']=='edd': fn = earliest_due_date
         elif args['baseline']=='hungarian': fn = expected_hungarian
-        else: fn = scoba_routing
-        
-        for i in range(trials):
+        elif args['baseline']=='scoba': fn = scoba_routing
+        elif args['baseline']=='ibr': fn = iterative_best_response
+        else:
+            raise NotImplementedError(f"Baseline method '{args['baseline']}' is not implemented.")
+
+        for trial in range(trials):
 
             props = {name: DroneProperties(tree=SearchTree(), interaction_events=[])
                       for name in drone_ordering}
@@ -246,21 +250,21 @@ def main():
             plot_initial_map(
                 depot_locs=DEPOT_LOCS, drones=server.agent_set,
                 package_dict=sim.active_packages,
-                radius_km=sim.distance_thresh)
+                radius_km=sim.distance_thresh,
+                trial=trial)
             
             for t in range(args['timesteps']):
+                # print("time ", t)
                 # logging.info(f"--- [t={t}] BEGIN TIMESTEP --- current_time = {sim.current_time}")
                 update_time_windows(sim, server, csv_logger=csv_logger)
-                # logging.info(f"[Before SCoBA] t={sim.current_time}, available pkgs={len(sim.active_packages)}")
-                fn(server, sim, rng, csv_logger=csv_logger, trial_id=i, time_step=t)
-                # logging.info(f"[After SCoBA] t={sim.current_time}, assigned={len(server.agent_task_allocation)}")
+                assign = bool(sim.active_packages)
+                if assign:
+                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t)
+                else:
+                    logging.info(f"No active packages available. Skipping assignment.")
+
                 update_routing_sim(sim, server, rng, csv_logger=csv_logger)
                 
-                # logging.info(f"--- [t={t}] END TIMESTEP --- current_time = {sim.current_time}")
-                # logging.info(f"Time step {t+1}/{args['timesteps']}: "
-                #       f"Active packages: {sim.num_active_packages}, "
-                #       f"Late packages: {sim.late_packages}, "
-                #       f"Delivered packages: {sim.delivered_packages}")
             late_pkgs.append(sim.late_packages)
             in_transit_pkgs.append(len(sim.busy_packages))
             delivered_pkgs.append(sim.delivered_packages)

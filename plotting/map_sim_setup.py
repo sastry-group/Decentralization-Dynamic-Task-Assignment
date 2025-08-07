@@ -27,7 +27,7 @@ strong_colors = [
 
 
 
-def plot_initial_map(depot_locs, drones, package_dict, radius_km):
+def plot_initial_map(depot_locs, drones, package_dict, radius_km, trial):
     fig, ax = plt.subplots(figsize=(12, 10))
     rng = default_rng(42) 
     legend_elements = []
@@ -93,5 +93,5 @@ def plot_initial_map(depot_locs, drones, package_dict, radius_km):
     ax.legend(handles=legend_elements, title="Drones", bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
 
-    plt.savefig("results/initial_map.png")
+    plt.savefig(f"results/initial_map_trial_{trial}.png")
     plt.close(fig)
