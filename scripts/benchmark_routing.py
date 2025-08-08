@@ -82,12 +82,12 @@ def parse_commandline():
     p.add_argument('--n_drones',         type=int,   required=True)
     p.add_argument('--n_depots',         type=int,   required=True)
     p.add_argument('--new_request_prob', type=float, required=True)
-    p.add_argument('--time_window',      type=float, required=True)
+    p.add_argument('--time_window',      type=int, required=True)
     p.add_argument('--timesteps',        type=int,   required=True)
     p.add_argument('--baseline',
                    choices=['mcts','edd','hungarian','scoba', 'ibr'],
                    required=True)
-    p.add_argument('out_file_name',      type=str)
+    # p.add_argument('out_file_name',      type=str)
     return vars(p.parse_args())
 
 
@@ -107,11 +107,16 @@ def main():
     city = parse_city_params(PARAMS_FN)
     lat_dist = uniform(loc=city['lat_start'], scale=city['lat_end']-city['lat_start'])
     lon_dist = uniform(loc=city['lon_start'], scale=city['lon_end']-city['lon_start'])
+    baseline = args['baseline']
+    log_dir = "dr{}_dep{}_probpt{}_win{}_{}".format(
+        args['n_drones'], args['n_depots'],
+        str(args['new_request_prob']).replace('.', ''),
+        args['time_window'], args['baseline']
+    )
+
+    csv_logger = CSVLogger(filepath=f"results/logs/{log_dir}/")
 
     
-    csv_logger = CSVLogger(filepath=f"results/logs/{args['out_file_name'].replace('.json', '')}/")
-    log_dir = args['out_file_name'].replace('.json', '')
-    baseline = args['baseline']
     filename = f"results/logs/{log_dir}/sim_{baseline}.log"
     logging.basicConfig(
         filename=filename,
@@ -121,7 +126,7 @@ def main():
     )
     
     
-    logging.info(args['out_file_name'])
+    logging.info(log_dir)
 
 
     # Load travel-time estimates
@@ -289,8 +294,8 @@ def main():
     results['in_transit'] = in_transit_pkgs
     results['delivered'] = delivered_pkgs
     results['total'] = total_pkgs
-    
-    with open(f"results/logs/{args['out_file_name'].replace('.json', '')}/{args['out_file_name']}", 'w') as outf:
+
+    with open(f"results/logs/{log_dir}/{log_dir}.json", 'w') as outf:
         json.dump(results, outf, indent=2)
 
     csv_logger.close()

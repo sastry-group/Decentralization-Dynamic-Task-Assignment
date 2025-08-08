@@ -61,29 +61,29 @@ def generate_package_request(pkg_name, lat_dist: uniform,
     Create a random package delivery request.
     """
 
-    # lat = lat_dist.rvs(random_state=rng)
-    # lon = lon_dist.rvs(random_state=rng)
-    # delivery = LatLonCoords(lat=lat, lon=lon)
-    # start = current_time + rng_int.integers(tw_duration // 2, tw_duration + 1)
-    # length = rng_int.integers(tw_duration // 2, tw_duration + 1)
-    # window = (start, start + length)
-    # pkg = Package(delivery=delivery, time_window=window)
-    # return pkg
-    while True:
-        lat = lat_dist.rvs(random_state=rng)
-        lon = lon_dist.rvs(random_state=rng)
-        delivery = LatLonCoords(lat=lat, lon=lon)
+    lat = lat_dist.rvs(random_state=rng)
+    lon = lon_dist.rvs(random_state=rng)
+    delivery = LatLonCoords(lat=lat, lon=lon)
+    start = current_time + rng_int.integers(tw_duration // 2, tw_duration + 1)
+    length = rng_int.integers(tw_duration // 2, tw_duration + 1)
+    window = (start, start + length)
+    pkg = Package(delivery=delivery, time_window=window)
+    return pkg
+    # while True:
+    #     lat = lat_dist.rvs(random_state=rng)
+    #     lon = lon_dist.rvs(random_state=rng)
+    #     delivery = LatLonCoords(lat=lat, lon=lon)
 
-        for depot in depot_locs:
-            dist = EuclideanLatLongMetric().evaluate(
-                convert_to_vector(delivery),
-                convert_to_vector(depot)
-            )
-            if dist <= (dist_thresh - 0.4):
-                start = current_time + rng_int.integers(tw_duration // 2, tw_duration + 1)
-                length = rng_int.integers(tw_duration // 2, tw_duration + 1)
-                window = (start, start + length)
-                return Package(delivery=delivery, time_window=window)
+    #     for depot in depot_locs:
+    #         dist = EuclideanLatLongMetric().evaluate(
+    #             convert_to_vector(delivery),
+    #             convert_to_vector(depot)
+    #         )
+    #         if dist <= (dist_thresh - 0.4):
+    #             start = current_time + rng_int.integers(tw_duration // 2, tw_duration + 1)
+    #             length = rng_int.integers(tw_duration // 2, tw_duration + 1)
+    #             window = (start, start + length)
+    #             return Package(delivery=delivery, time_window=window)
 
 
 
@@ -116,10 +116,11 @@ def sample_true_delivery_return_time(drone_pkg_window: Tuple[float,float,float],
     # td = max(current_time + delta, drone_pkg_window[0])
     # rt = math.ceil(td) + rng.normal(loc=mean, scale=scale)
     ep = epanechnikov(rng, mean, scale)  # sample from Epanechnikov distribution
-    td = round(current_time + ep)
-    # print(f"current {current_time}, drone window start {drone_pkg_window[0]}, travel mean {mean}, epanechnikov output {ep} with scale {scale}")
+    td = math.ceil(current_time + ep)
+
+    # print(f"current {current_time}, drone window start {drone_pkg_window[0]}, travel mean {mean}, epanechnikov output {ep} with scale {scale}, td {td}")
     td = max(td, drone_pkg_window[0]) # ensuring the delivery time is not before the start of the time window
-    rt = td + round(ep)
+    rt = td + math.ceil(ep)
 
 
     return td, rt   
@@ -258,6 +259,7 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
             
             if sim.current_time < delivery:
                 pp_loc = sim.busy_packages[pkg].delivery
+
                 max_diff = max(delivery, ret - delivery)
                 interp_factor = (delivery - sim.current_time) / max_diff
                 new_lat = depot.lat + (1 - interp_factor) * (pp_loc.lat - depot.lat)
@@ -268,7 +270,9 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
                     continue
 
                 pp_loc = sim.done_packages[pkg].delivery
-                interp_factor = (ret - sim.current_time) / (ret - delivery)
+
+                max_diff = max(delivery, ret - delivery)
+                interp_factor = (ret - sim.current_time) / max_diff
                 new_lat = depot.lat + interp_factor * (pp_loc.lat - depot.lat)
                 new_lon = depot.lon + interp_factor * (pp_loc.lon - depot.lon)
                 # pp_loc = sim.done_packages[pkg].delivery

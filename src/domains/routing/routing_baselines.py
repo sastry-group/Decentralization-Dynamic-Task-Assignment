@@ -170,7 +170,7 @@ def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, 
 
                 # get the actual delivery time and return time
                 td, rt = sample_true_delivery_return_time(
-                    server.agent_task_windows[(dn, pkg)],
+                    server.agent_task_windows[(drone_id, pkg)],
                     server.current_time,
                     routing_sim.tt_est_std_scale,
                     rng,
@@ -178,6 +178,7 @@ def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, 
                 # Update sim state
                 routing_sim.true_delivery_return[(drone_id, pkg)] = (td, rt)
                 server.agent_prop_set[drone_id].at_depot = False
+                server.agent_prop_set[drone_id].current_package = pkg
                 routing_sim.busy_packages[pkg] = routing_sim.active_packages.pop(pkg)
                 routing_sim.num_active_packages -= 1
                 

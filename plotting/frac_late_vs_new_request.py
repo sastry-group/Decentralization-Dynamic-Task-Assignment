@@ -17,16 +17,19 @@ mean_time = {a: [] for a in algos}
 sem_time = {a: [] for a in algos}
 
 # Extract n_drones and n_depots from sample file
-sample_folder = f"dr15_dep5_probpt{str(probs[0]).replace('.','')}_win10_{algos[0]}"
+sample_folder = f"dr15_dep5_probpt{str(probs[0]).replace('.','')}_win15_{algos[0]}"
 sample_fn = os.path.join(base_dir, sample_folder, f"{sample_folder}.json")
-m = re.search(r"dr(\d+)_dep(\d+)", sample_fn)
-n_drones, n_depots = m.groups() if m else ("?", "?")
+m = re.search(r"dr(\d+)_dep(\d+)_probpt(\d+)_win(\d+)", sample_folder)
+if m:
+    n_drones, n_depots, prob_str, window = m.groups()
+else:
+    n_drones, n_depots, prob_str, window = "?", "?", "?", "?"
 
 # Load results
 for a in algos:
     for p in probs:
         prob_str = str(p).replace('.', '')
-        folder = f"dr{n_drones}_dep{n_depots}_probpt{prob_str}_win10_{a}"
+        folder = f"dr{n_drones}_dep{n_depots}_probpt{prob_str}_win{window}_{a}"
         filepath = os.path.join(base_dir, folder, f"{folder}.json")
         if not os.path.exists(filepath):
             print(f"Warning: File not found: {filepath}")
@@ -73,7 +76,7 @@ ax.legend()
 plt.title(f"{n_drones} drones, {n_depots} depots")
 
 plt.tight_layout()
-plt.savefig("results/frac_late_vs_new_request.png")
+plt.savefig(f"results/frac_late_dr{n_drones}_dep{n_depots}_probpt{str(probs[0]).replace('.', '')}_win{window}.png")
 
 
 
@@ -98,4 +101,4 @@ ax.set_title(f"Computation Time — {n_drones} drones, {n_depots} depots")
 
 plt.tight_layout()
 ax.legend()
-plt.savefig("results/time_per_assignment_vs_new_request.png")
+plt.savefig(f"results/time_per_assignment_dr{n_drones}_dep{n_depots}_probpt{str(probs[0]).replace('.', '')}_win{window}.png")

@@ -137,6 +137,7 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                     if isinstance(node, DecisionNode) and node.attempt:
                         task = node.task_name
                         task_utils[task] = max(task_utils.get(task, float('-inf')), node.util)
+                        logging.info(f"[Tree] Drone {dn}: Task '{task}' has utility {node.util:.2f}")
 
                 idx = get_next_attempt_idx(tree)
                 if idx != -1:
@@ -152,6 +153,7 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                     assigned_pkgs.add(pkg)
                     task_util_allocation[dn] = (pkg, util)
                     all_considered[dn] = choices
+                    
                 
 
 

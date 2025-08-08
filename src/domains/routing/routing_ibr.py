@@ -138,131 +138,127 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                 "num_drones": len(drones),
             })
     
-    
-    # Finding nearby packages
-    assigned: Dict[str, str] = {}
-    best_ies: Dict[str, Tuple[str, float]] = {}
-    final_assignment: Dict[str, Tuple[str, float, InteractionEvent]] = {}
-    
-    for depot_num, drones in depots.items():
+
+    # Precompute in-range packages per depot
+    in_range_pkgs: Dict[int, Set[str]] = {}
+    interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
+
+    for depot_id, drones in depots.items():
         depot_loc = server.agent_set[drones[0]].depot_loc
-        
-        in_range = set()
+        in_range_pkgs[depot_id] = set()
+
         for pkg, pp in routing_sim.active_packages.items():
             dist = EuclideanLatLongMetric().evaluate(
                 convert_to_vector(depot_loc), convert_to_vector(pp.delivery)
             )
             if dist <= routing_sim.distance_thresh:
-                approx_travel_time = get_travel_time_estimate(
+                approx_tt = get_travel_time_estimate(
                     routing_sim.halton_nn_tree,
-                    depot_loc,
-                    pp.delivery,
+                    depot_loc, pp.delivery,
                     routing_sim.estimate_matrix,
                     routing_sim.time_scale
                 )
-                pp.approx_travel_times[depot_num] = approx_travel_time
-                in_range.add(pkg)
+                pp.approx_travel_times[depot_id] = approx_tt
+                in_range_pkgs[depot_id].add(pkg)
                 if csv_logger:
                     csv_logger.log("depot_package_distances.csv", {
                         "trial": trial_id,
                         "time": time_step,
-                        "depot_id": depot_num,
+                        "depot_id": depot_id,
                         "pkg_id": pkg,
                         "pkg_lat": pp.delivery.lat,
                         "pkg_lon": pp.delivery.lon,
                         "depot_lat": depot_loc.lat,
                         "depot_lon": depot_loc.lon,
                         "distance": dist,
-                        "approx_travel_time": approx_travel_time,
+                        "approx_travel_time": approx_tt,
                     })
-        
 
-        interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
+        # Precompute events for each drone in this depot
         for dn in drones:
-            events = [
+            interaction_events_by_drone[dn] = [
                 ie for ie in server.agent_prop_set[dn].interaction_events
-                if ie.task_name in in_range and
-                ie.task_name not in routing_sim.busy_packages
+                if ie.task_name in in_range_pkgs[depot_id]
+                and ie.task_name not in routing_sim.busy_packages
             ]
-            interaction_events_by_drone[dn] = events
 
 
+    # Initial assignment per depot, sequential, no cross-depot restriction
+    assigned: Dict[str, str] = {}
+    best_ies: Dict[str, Tuple[str, float]] = {}
+    final_assignment: Dict[str, Tuple[str, float, InteractionEvent]] = {}
+
+    for depot_id, drones in depots.items():
+        assigned_pkgs_in_depot: Set[str] = set()
 
         if init_method == "random":
             for dn in drones:
-                events = interaction_events_by_drone.get(dn, [])
-                available_events = [ie for ie in events if ie.task_name not in assigned]
-                if available_events:
-                    ie = rng.choice(available_events)
+                available = [
+                    ie for ie in interaction_events_by_drone.get(dn, [])
+                    if ie.task_name not in assigned_pkgs_in_depot
+                ]
+                if available:
+                    ie = rng.choice(available)
                     assigned[dn] = ie.task_name
+                    assigned_pkgs_in_depot.add(ie.task_name)
 
         elif init_method == "greedy":
-            
             for dn in drones:
                 best_ie = None
                 best_util = float("-inf")
-                events = interaction_events_by_drone.get(dn, [])
-                for ie in events:
-
-                    if ie.task_name in assigned or ie.task_name in routing_sim.busy_packages:
+                for ie in interaction_events_by_drone.get(dn, []):
+                    if ie.task_name in assigned_pkgs_in_depot:
                         continue
-                    # u = compute_utility(
-                    #     ie=ie,
-                    #     agent=dn,
-                    #     assigned=assigned,
-                    #     server=server,
-                    #     routing_sim=routing_sim,
-                    #     mode="exact",  # or "exact"
-                    #     lambda_conflict=500,
-                    #     delivery_reward=routing_sim.delivery_reward
-                    # )
                     u = delivery_util(routing_sim.delivery_reward, ie)
                     if u > best_util:
                         best_util = u
                         best_ie = ie
                 if best_ie:
                     assigned[dn] = best_ie.task_name
+                    assigned_pkgs_in_depot.add(best_ie.task_name)
                     best_ies[dn] = (best_ie.task_name, best_util)
-                    final_assignment[dn] = (best_ie.task_name, best_util, best_ie) 
+                    final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
                 else:
                     best_ies[dn] = (None, 0.0)
 
-                     
+    # Iterative best response
+    iter_count = 0
+    updated = True
+    while updated and iter_count < max_iters:
+        updated = False
+        for dn in assigned.keys():  # all drones assigned in step 2
+            if not server.agent_prop_set[dn].at_depot:
+                continue
+            # All other drones' assignments (global)
+            assigned_pkgs_global = {assigned[other] for other in assigned if other != dn}
 
-        iter_count = 0
-        updated = True
-        while updated and iter_count < max_iters:
-            updated = False
-            for dn in drones:
-                if not server.agent_prop_set[dn].at_depot:
-                    continue # skip drones in transit
-                neighbors = [other_dn for other_dn in drones if other_dn != dn]
-                assigned_pkgs = {assigned[n] for n in neighbors if assigned.get(n) is not None}
-                best_ie = None
-                best_util = float("-inf")
-                for ie in interaction_events_by_drone.get(dn, []):
-                    pkg = ie.task_name
-                    if pkg in assigned_pkgs or pkg in routing_sim.busy_packages or pkg in assigned.values():
-                        continue
-                    # u = delivery_util(routing_sim.delivery_reward, ie)
-                    u = compute_utility(
-                        ie=ie,
-                        agent=dn,
-                        assigned=assigned,
-                        server=server,
-                        routing_sim=routing_sim,
-                        mode="exact",  # or "exact"
-                        lambda_conflict=500,
-                        delivery_reward=routing_sim.delivery_reward
-                    )
-                    if u > best_util:
-                        best_util = u
-                        best_ie = ie
-                if best_ie and assigned[dn] != best_ie.task_name:
-                    assigned[dn] = best_ie.task_name                    
-                    updated = True
-                    final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
-            iter_count += 1
+            best_ie = None
+            best_util = float("-inf")
+            for ie in interaction_events_by_drone.get(dn, []):
+                pkg = ie.task_name
+                if pkg in assigned_pkgs_global or pkg in routing_sim.busy_packages:
+                    continue
+                u = compute_utility(
+                    ie=ie,
+                    agent=dn,
+                    assigned=assigned,
+                    server=server,
+                    routing_sim=routing_sim,
+                    mode="exact",
+                    lambda_conflict=500,
+                    delivery_reward=routing_sim.delivery_reward
+                )
+                if u > best_util:
+                    best_util = u
+                    best_ie = ie
+            if best_ie and assigned[dn] != best_ie.task_name:
+                assigned[dn] = best_ie.task_name
+                updated = True
+                final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
+        iter_count += 1
+
+
+
 
     for dn, pkg in assigned.items():
         if pkg in routing_sim.busy_packages:
@@ -283,6 +279,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
             routing_sim.busy_packages[pkg] = routing_sim.active_packages.pop(pkg)
             routing_sim.num_active_packages -= 1
             final_pkg, util, ie = final_assignment[dn]
+            depot_num = server.agent_set[dn].depot_number
             assert final_pkg == pkg, f"Final assigned pkg mismatch for {dn}: expected {pkg}, got {final_pkg}"
 
             if csv_logger:
@@ -298,6 +295,6 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     "true_return_time": rt,
                     "true_delivery_time": td,
                     "success_prob": util,
-                    "approx_travel_time": routing_sim.busy_packages[pkg].approx_travel_times.get(dn),
+                    "approx_travel_time": routing_sim.busy_packages[pkg].approx_travel_times.get(depot_num),
                     "true_travel_time": rt-td
                 })
