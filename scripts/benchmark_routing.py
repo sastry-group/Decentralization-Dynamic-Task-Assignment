@@ -45,7 +45,7 @@ def parse_city_params(toml_path: str):
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 from domains.routing.routing_types     import LatLonCoords, Drone, DroneProperties
-from plotting.map_sim_setup import plot_initial_map
+from plotting.map_sim_setup import plot_initial_map, plot_comms_graph
 
 from domains.routing.routing_simulator import (
     setup_routing_sim,
@@ -172,6 +172,54 @@ def main():
     num_init = int(round(1.5 * args['n_drones'])) #request number
     
 
+    # full
+    # comms_dict = {
+    #     1: [2,3,4,5],
+    #     2: [1,3,4,5],
+    #     3: [1,2,4,5],
+    #     4: [1,2,3,5],
+    #     5: [1,2,3,4]
+
+    # }
+
+    # edge removed (1,2), T(G) = 2
+    comms_dict = {
+        1: [3,4,5],
+        2: [1,3,4,5],
+        3: [1,2,4,5],
+        4: [1,2,3,5],
+        5: [1,2,3,4]
+    }
+    
+    # edge removed (1,2), (3,1) T(G) = 3
+    # comms_dict = {
+    #     1: [3,4,5],
+    #     2: [1,3,4,5],
+    #     3: [2,4,5],
+    #     4: [1,2,3,5],
+    #     5: [1,2,3,4]
+    # }
+    
+    # edge removed (1,2),  (3,1), (4,3), T(G) = 4
+    # comms_dict = {
+    #     1: [3,4,5],
+    #     2: [1,3,4,5],
+    #     3: [2,4,5],
+    #     4: [1,2,5],
+    #     5: [1,2,3,4]
+    # }
+        
+    # comms_dict = {
+    #     1: [3,4,5],
+    #     2: [1,3,4,5],
+    #     3: [1,2,4,5],
+    #     4: [1,2,3,5],
+    #     5: [1,2,3,4]
+    # }
+
+    plot_comms_graph(comms_dict, DEPOT_LOCS, log_dir)
+
+
     # Run trials
     logging.info(f"Running {args['baseline']} baseline for {trials} trials.")
     if args['baseline']=='mcts':
@@ -267,7 +315,7 @@ def main():
                 assign = bool(sim.active_packages)
                 if assign:
                     start_time = time.perf_counter()
-                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t)
+                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t, comms_dict=comms_dict)
                     end_time = time.perf_counter()
                     elapsed_time = end_time - start_time
                     timing_per_timestep.append(elapsed_time)

@@ -64,9 +64,9 @@ def generate_package_request(pkg_name, lat_dist: uniform,
     lat = lat_dist.rvs(random_state=rng)
     lon = lon_dist.rvs(random_state=rng)
     delivery = LatLonCoords(lat=lat, lon=lon)
-    start = current_time + rng_int.integers(tw_duration // 2, tw_duration + 1)
-    length = rng_int.integers(tw_duration // 2, tw_duration + 1)
-    window = (start, start + length)
+    start = round(current_time + rng.uniform(tw_duration // 2, tw_duration))
+    duration = round(rng.uniform(tw_duration // 2, tw_duration))
+    window = (start, start + duration)
     pkg = Package(delivery=delivery, time_window=window)
     return pkg
     # while True:
@@ -81,7 +81,7 @@ def generate_package_request(pkg_name, lat_dist: uniform,
     #         )
     #         if dist <= (dist_thresh - 0.4):
     #             start = current_time + rng_int.integers(tw_duration // 2, tw_duration + 1)
-    #             length = rng_int.integers(tw_duration // 2, tw_duration + 1)
+    #             length = round(rng.uniform(tw_duration, tw_duration * 2))
     #             window = (start, start + length)
     #             return Package(delivery=delivery, time_window=window)
 
@@ -116,7 +116,7 @@ def sample_true_delivery_return_time(drone_pkg_window: Tuple[float,float,float],
     # td = max(current_time + delta, drone_pkg_window[0])
     # rt = math.ceil(td) + rng.normal(loc=mean, scale=scale)
     ep = epanechnikov(rng, mean, scale)  # sample from Epanechnikov distribution
-    td = math.ceil(current_time + ep)
+    td = round(current_time + ep)
 
     # print(f"current {current_time}, drone window start {drone_pkg_window[0]}, travel mean {mean}, epanechnikov output {ep} with scale {scale}, td {td}")
     td = max(td, drone_pkg_window[0]) # ensuring the delivery time is not before the start of the time window
@@ -150,7 +150,10 @@ def setup_routing_sim(params_fn: str,
     for n in range(1, num_init_requests+1):
         name = f"pkg{n}"
         # improve this to get te eactual distance_threshh
-        pkg = generate_package_request(name, lat_dist, lon_dist, 0.0, time_window_duration, rng, depot_locs=depot_locs, dist_thresh=5 ,csv_logger=csv_logger)
+        pkg = generate_package_request(name, lat_dist, lon_dist, 0.0, 
+                                       time_window_duration, rng, 
+                                       depot_locs=depot_locs, dist_thresh=5 ,
+                                       csv_logger=csv_logger)
         active_packages[name] = pkg
 
 
@@ -366,7 +369,8 @@ def update_time_windows(sim, server, csv_logger=None) -> None:
                         MODE.START:   start,
                         MODE.FINISH:  finish,
                         MODE.RETURN: math.ceil(finish) + return_time,
-                    }
+                    },
+                    travel_time=return_time,
                 )
                 events.append(ie)
                 csv_logger.log("interaction_events.csv", {

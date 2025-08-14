@@ -10,23 +10,28 @@ from solver.scoba_tree_search import generate_search_tree, get_next_attempt_idx
 from solver.scoba_conflict_resolution import SCoBAAlgorithm
 
 from domains.routing.routing_types import EuclideanLatLongMetric, convert_to_vector
-from domains.routing.routing_simulator import sample_true_delivery_return_time, get_travel_time_estimate
+from domains.routing.routing_simulator import sample_true_delivery_return_time, get_travel_time_estimate, epanechnikov
+
+
+rng = np.random.RandomState(1345)
 
 def delivery_util(reward: float, ie: InteractionEvent) -> float:
-    # Compute a realistic utility as expected reward
-    p_succ = delivery_success_prob(std_scale=2.0, 
-                                   ref_time=ie.timestamps[MODE.FINISH],
-                                   ie=ie)
-    
-    return reward * p_succ
+    return reward
 
 def delivery_success_prob(std_scale: float, ref_time: float, ie: InteractionEvent) -> float:
-    travel_time = ie.timestamps[MODE.RETURN] - ie.timestamps[MODE.FINISH]
-    mean = travel_time
-    scale = travel_time / std_scale
-    x = ie.timestamps[MODE.FINISH] - ref_time 
-    prob = epanechnikov_cdf(x, mean, scale)
-    return prob
+
+    start = max(ie.timestamps[MODE.START], ref_time)
+    time_remaining = ie.timestamps[MODE.FINISH] - start  # deadline - now
+
+    # expected duration (you need a nominal estimate — e.g., model/historical)
+    expected_duration = ie.travel_time  
+    sigma = max(1e-9, expected_duration / std_scale)
+
+    # travel_time = ie.timestamps[MODE.RETURN] - ie.timestamps[MODE.FINISH]
+    # mean = travel_time
+    # std_val = travel_time / std_scale
+    # tt_dist = epanechnikov(rng, mean, std_val)
+    return epanechnikov_cdf(time_remaining, expected_duration, sigma)
 
 
 def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
@@ -46,7 +51,7 @@ def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
         z = (x - mean) / scale
         return 0.75 * (z / sqrt5 - (z ** 3) / (3 * sqrt5 ** 3)) + 0.5
 
-def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_id=None, time_step=None) -> None:
+def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_id=None, time_step=None, comms_dict=None) -> None:
     """
     Assign tasks to drones using the SC0BA conflict-based allocation algorithm.
     `server` is a RoutingAllocation, `routing_sim` a RoutingSimulator.
@@ -127,7 +132,6 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
             if att is not None and skip is not None:
                 a_util = tree.nodes[att].util
                 s_util = tree.nodes[skip].util
-                logging.info(f"[Debug] pkg branch: attempt util={a_util:.2f}, skip util={s_util:.2f}")
             if tree and tree.nodes:
                 # logging.info(f"[Tree] Drone {dn}: Tree has {len(tree.nodes)} nodes.")
 
@@ -137,7 +141,7 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                     if isinstance(node, DecisionNode) and node.attempt:
                         task = node.task_name
                         task_utils[task] = max(task_utils.get(task, float('-inf')), node.util)
-                        logging.info(f"[Tree] Drone {dn}: Task '{task}' has utility {node.util:.2f}")
+                        # logging.info(f"[Tree] Drone {dn}: Task '{task}' has utility {node.util:.2f}")
 
                 idx = get_next_attempt_idx(tree)
                 if idx != -1:

@@ -31,7 +31,7 @@ def plot_initial_map(depot_locs, drones, package_dict, radius_km, trial):
     fig, ax = plt.subplots(figsize=(12, 10))
     rng = default_rng(42) 
     legend_elements = []
-    deg_per_km = 1.0 / 111.0
+    deg_per_km = 1.0 / 110.2
     radius_deg = radius_km * deg_per_km
 
     # Depots
@@ -94,4 +94,64 @@ def plot_initial_map(depot_locs, drones, package_dict, radius_km, trial):
     plt.tight_layout()
 
     plt.savefig(f"results/initial_map_trial_{trial}.png")
+    plt.close(fig)
+
+
+def plot_comms_graph(comms_dict, depot_locs, log_dir=None):
+    fig, ax = plt.subplots(figsize=(12, 10))
+    rng = default_rng(42) 
+    legend_elements = []
+    deg_per_km = 1.0 / 110.2
+    radius_deg = 0.01 * deg_per_km
+
+    # Depots
+    cmap_depot = cm.get_cmap('viridis', len(depot_locs))
+    depot_colors = {i: cmap_depot(i) for i in range(len(depot_locs))}
+
+    
+    for i, loc in enumerate(depot_locs):
+        circle = patches.Circle(
+            (loc.lon, loc.lat),         # (x, y) = (lon, lat)
+            radius=radius_deg,
+            edgecolor=depot_colors[i],
+            facecolor=depot_colors[i],
+            linestyle='--',
+            alpha=0.2,
+            label='Coverage Area' if i == 0 else ""  # only one legend entry
+        )
+        ax.add_patch(circle)
+        ax.scatter(loc.lon, loc.lat,
+                color=depot_colors[i], marker='o', s=500, alpha=0.4, 
+                label='Depot' if i == 0 else "")
+        ax.text(loc.lon, loc.lat + 0.002, f"Depot {i+1}", color='gray', fontsize=12)
+        legend_elements.append(Line2D([0], [0], marker='o', color='w', label=f'Depot{i+1}',
+                                    markerfacecolor=depot_colors[i], markersize=10))
+
+
+    
+    # Draw communication arrows between depots
+    linestyles = ['-', '--', '-.', ':']
+    for src_id, targets in comms_dict.items():
+        depot_loc = depot_locs[int(src_id-1)]
+        src_x = depot_loc.lon 
+        src_y = depot_loc.lat 
+        depot_color = depot_colors[int(src_id-1)]
+        linestyle = linestyles[int(src_id - 1) % len(linestyles)]
+
+        for tgt_id in targets:
+            tgt_loc = depot_locs[int(tgt_id-1)]
+            tgt_x = tgt_loc.lon 
+            tgt_y = tgt_loc.lat 
+
+            ax.annotate(
+                '', xy=(tgt_x, tgt_y), xytext=(src_x, src_y), 
+                arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.05", linestyle=linestyle, color=depot_color, lw=2, alpha=0.6)
+            )
+
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.grid(True)
+    ax.legend(handles=legend_elements, title="Depots", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(f"results/comms_graph.png")
     plt.close(fig)

@@ -14,6 +14,7 @@ class InteractionEvent:
     agent_name: str
     task_name: str
     timestamps: Dict[MODE, float]
+    travel_time: float = 0.0
 
 @dataclass
 class DecisionNode:

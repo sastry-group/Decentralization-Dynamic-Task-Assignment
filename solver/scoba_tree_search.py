@@ -68,11 +68,11 @@ def insert_decision_node(tree: SearchTree, agent_name: str, ie: InteractionEvent
     tree.nodes.append(onode2)
     tree.parent_id[succ_idx] = attempt_idx
     tree.child_ids[attempt_idx] = [succ_idx, fail_idx]
-    # logging.info(
-    #     f"[Outcome Added] Task {ie.task_name} — success_prob={success_prob:.4f}, "
-    #     f"utilval={utilval:.2f}, succ_time={ie.timestamps[MODE.SUCCESS]:.2f}, "
-    #     f"fail_time={ie.timestamps[MODE.FINISH]:.2f}, ref_time={ref_time:.2f}"
-    # )
+    logging.info(
+        f"[Outcome Added] Task {ie.task_name} — success_prob={success_prob:.4f}, "
+        f"utilval={utilval:.2f}, succ_time={ie.timestamps[MODE.RETURN]:.2f}, "
+        f"fail_time={ie.timestamps[MODE.FINISH]:.2f}, ref_time={ref_time:.2f}"
+    )
 
     return [succ_idx, fail_idx], no_attempt_idx
 

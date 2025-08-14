@@ -4,35 +4,37 @@ from collections import deque
 import logging
 
 
+from domains.routing.routing_scoba import delivery_success_prob
 from solver.scoba_types import InteractionEvent, MODE, GenericAllocation as RoutingAllocation
 from domains.routing.routing_types import RoutingSimulator, EuclideanLatLongMetric, convert_to_vector
 from domains.routing.routing_simulator import sample_true_delivery_return_time, get_travel_time_estimate
+from domains.graph_builder import build_comm_structure
 
 
 
-
-
-def create_comm_graph(depots: Dict[int, List[str]]) -> Dict[str, List[str]]:
+def build_comm_structure(depots: Dict[int, list], comms_dict: dict = None):
     """
-    Create a communication graph where each agent can only see others in the same depot.
-    Returns a dictionary mapping agent_id -> list of neighbor agent_ids.
+    Build a mapping of which depots can see which other depots.
+    comms_dict format: {depot_id: [list of visible depot_ids]}.
+    If comms_dict is None, default to full communication (all-to-all).
     """
-    comm_graph = {}
-    for drone_list in depots.values():
-        for dn in drone_list:
-            # Exclude self from neighbors
-            comm_graph[dn] = [other_dn for other_dn in drone_list if other_dn != dn]
-    return comm_graph
+    depot_ids = list(depots.keys())
+    if comms_dict is None:
+        # Full graph: each depot sees all others (including itself)
+        return {d: depot_ids for d in depot_ids}
+    else:
+        # Ensure each depot exists in the dictionary
+        return {d: comms_dict.get(d, []) for d in depot_ids}
 
 
 
-def delivery_util(reward: float, ie: InteractionEvent) -> float:
-    # Compute a realistic utility as expected reward
-    p_succ = delivery_success_prob(std_scale=2.0, 
-                                   ref_time=ie.timestamps[MODE.FINISH],
-                                   ie=ie)
-    
-    return reward * p_succ
+def delivery_util(std_scale, reward: float, ref_time: float, ie: InteractionEvent) -> float:
+    prob_success = delivery_success_prob(
+        std_scale=std_scale,
+        ref_time=ref_time,
+        ie=ie,
+    )
+    return reward * prob_success
 
 
 def welfare_function(task_set: Set[str], delivery_reward=1000.0) -> float:
@@ -78,13 +80,19 @@ def compute_utility(ie: InteractionEvent,
 
 
 
-def delivery_success_prob(std_scale: float, ref_time: float, ie: InteractionEvent) -> float:
-    travel_time = ie.timestamps[MODE.RETURN] - ie.timestamps[MODE.FINISH]
-    mean = travel_time
-    scale = travel_time / std_scale
-    x = ie.timestamps[MODE.FINISH] - ref_time 
-    prob = epanechnikov_cdf(x, mean, scale)
-    return prob
+def delivery_success_prob(std_scale: float, ref_time: float, ie) -> float:
+    # remaining time until the hard deadline
+    start = max(ie.timestamps[MODE.START], ref_time)
+    time_remaining = ie.timestamps[MODE.FINISH] - start  # deadline - now
+
+    # expected duration (you need a nominal estimate — e.g., model/historical)
+    expected_duration = ie.travel_time  
+
+    # std dev as a fraction of mean (std_scale ≈ 3.0 => σ = μ/3)
+    sigma = max(1e-9, expected_duration / std_scale)
+
+    # CDF of finishing before the deadline
+    return epanechnikov_cdf(time_remaining, expected_duration, sigma)
 
 
 def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
@@ -96,13 +104,12 @@ def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
     a = mean - sqrt5 * scale
     b = mean + sqrt5 * scale
 
-    if x <= a:
-        return 0.0
-    elif x >= b:
-        return 1.0
-    else:
-        z = (x - mean) / scale
-        return 0.75 * (z / sqrt5 - (z ** 3) / (3 * sqrt5 ** 3)) + 0.5
+    if x <= a: return 0.0
+    if x >= b: return 1.0
+
+    u = (x - mean) / (sqrt5 * scale) # normalized to [-1,1]
+    # CDF of Epanechnikov kernel on [-1,1]: 0.5 + 0.75*(u - u^3/3)
+    return max(0.0, min(1.0, 0.5 + 0.75 * (u - (u**3)/3.0)))
 
 
 
@@ -115,8 +122,8 @@ def best_response_utility(current_time, ie, reward=1000):
 
 
 def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimulator, rng=None, csv_logger=None,
-                            init_method = "greedy", trial_id=None, time_step=None):
-    max_iters = 20
+                            init_method = "greedy", trial_id=None, time_step=None, comms_dict=None):
+    max_iters = 40
     depots: Dict[int, List[str]] = {}
     # group drones by depot
     for dn, dp in server.agent_prop_set.items():
@@ -124,6 +131,9 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
             dnum = server.agent_set[dn].depot_number
             depots.setdefault(dnum, []).append(dn)
     # logging.info(f"Drones at depot information: {depots}")
+
+    # depot_visibility = build_comm_structure(depots, comms_dict)
+    depot_visibility = comms_dict
 
     if csv_logger:
         for depot_num, drones in depots.items():
@@ -187,6 +197,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     assigned: Dict[str, str] = {}
     best_ies: Dict[str, Tuple[str, float]] = {}
     final_assignment: Dict[str, Tuple[str, float, InteractionEvent]] = {}
+    all_task_utils: Dict[Tuple[str, str], float] = {}
 
     for depot_id, drones in depots.items():
         assigned_pkgs_in_depot: Set[str] = set()
@@ -209,7 +220,9 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                 for ie in interaction_events_by_drone.get(dn, []):
                     if ie.task_name in assigned_pkgs_in_depot:
                         continue
-                    u = delivery_util(routing_sim.delivery_reward, ie)
+                    u = delivery_util(routing_sim.tt_est_std_scale, routing_sim.delivery_reward, ref_time=routing_sim.current_time, ie=ie)
+                    logging.info(f"Timestep: {time_step}, drone {dn}, pkg {ie.task_name}, utility: {u}")
+                    all_task_utils[(dn, ie.task_name)] = u
                     if u > best_util:
                         best_util = u
                         best_ie = ie
@@ -220,7 +233,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
                 else:
                     best_ies[dn] = (None, 0.0)
-
+    
     # Iterative best response
     iter_count = 0
     updated = True
@@ -229,14 +242,18 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
         for dn in assigned.keys():  # all drones assigned in step 2
             if not server.agent_prop_set[dn].at_depot:
                 continue
-            # All other drones' assignments (global)
-            assigned_pkgs_global = {assigned[other] for other in assigned if other != dn}
+            
+            depot_id = server.agent_set[dn].depot_number
+            visible_depots = depot_visibility[depot_id] + [depot_id]
+            visible_depots.sort()
+            visible_drones = [dr for dep in visible_depots for dr in depots.get(dep, [])]
+            assigned_pkgs_visible = {assigned[other] for other in visible_drones if other in assigned}
 
             best_ie = None
             best_util = float("-inf")
             for ie in interaction_events_by_drone.get(dn, []):
                 pkg = ie.task_name
-                if pkg in assigned_pkgs_global or pkg in routing_sim.busy_packages:
+                if pkg in assigned_pkgs_visible or pkg in routing_sim.busy_packages:
                     continue
                 u = compute_utility(
                     ie=ie,
@@ -256,6 +273,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                 updated = True
                 final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
         iter_count += 1
+
 
 
 

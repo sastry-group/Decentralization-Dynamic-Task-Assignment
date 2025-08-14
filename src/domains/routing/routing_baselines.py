@@ -90,7 +90,7 @@ def expected_hungarian(server: RoutingAllocation, routing_sim: RoutingSimulator,
 
 
 def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, rng: Any = None,
-                      csv_logger=None, trial_id=None, time_step=None) -> None:
+                      csv_logger=None, trial_id=None, time_step=None, comms_dict=None) -> None:
     """
     Assign drones to earliest due packages within range.
     """
