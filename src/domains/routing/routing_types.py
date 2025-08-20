@@ -70,12 +70,15 @@ class DroneProperties:
     current_package: str = ""
     interaction_events: List[Any] = field(default_factory=list)
     tree: Any = field(default_factory=lambda: None)  # placeholder for SearchTree
+    available_at: float = 0.0 
 
 @dataclass
 class Package:
     delivery: LatLonCoords
     time_window: Tuple[float, float]
+    name: str = ""
     approx_travel_times: Dict[int, float] = field(default_factory=dict)
+    distance_to_depots: Dict[int, float] = field(default_factory=dict)
 
 @dataclass
 class CurrDroneSiteLocs:
@@ -105,6 +108,6 @@ class RoutingSimulator:
     tt_est_std_scale: float             = 3.0
     distance_thresh: float              = 5.0 # kilometers
     curr_drone_site_locs: CurrDroneSiteLocs = field(default_factory=CurrDroneSiteLocs)
-    depot_locs: Dict[str, LatLonCoords] = field(default_factory=dict)
+    depots: Dict[str, LatLonCoords] = field(default_factory=dict)
 
 

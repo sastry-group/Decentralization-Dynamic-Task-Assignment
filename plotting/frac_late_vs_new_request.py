@@ -17,7 +17,7 @@ mean_time = {a: [] for a in algos}
 sem_time = {a: [] for a in algos}
 
 # Extract n_drones and n_depots from sample file
-sample_folder = f"dr15_dep5_probpt{str(probs[0]).replace('.','')}_win15_{algos[0]}"
+sample_folder = f"dr10_dep2_probpt{str(probs[0]).replace('.','')}_win15_{algos[0]}"
 sample_fn = os.path.join(base_dir, sample_folder, f"{sample_folder}.json")
 m = re.search(r"dr(\d+)_dep(\d+)_probpt(\d+)_win(\d+)", sample_folder)
 if m:
@@ -56,6 +56,7 @@ x = np.arange(len(probs))
 width = 0.2
 
 fig, ax = plt.subplots(figsize=(6, 4))
+
 for i, a in enumerate(algos):
     ax.bar(
         x + i * width,
@@ -66,6 +67,13 @@ for i, a in enumerate(algos):
         label=a.upper(),
         color=colors.get(a)
     )
+    for j, (m, s) in enumerate(zip(mean_late[a], sem_late[a])):
+        ax.text(
+            x[j] + i * width, 
+            m + s + 0.01,   # above the error bar
+            f"{m:.2f}", 
+            ha="center", va="bottom", fontsize=9
+        )
 
 ax.set_xticks(x + (len(algos) - 1) * width / 2)
 ax.set_xticklabels([str(p) for p in probs])

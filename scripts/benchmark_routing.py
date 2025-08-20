@@ -44,7 +44,7 @@ def parse_city_params(toml_path: str):
 
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
-from domains.routing.routing_types     import LatLonCoords, Drone, DroneProperties
+from domains.routing.routing_types     import LatLonCoords, Drone, DroneProperties, Depot
 from plotting.map_sim_setup import plot_initial_map, plot_comms_graph
 
 from domains.routing.routing_simulator import (
@@ -73,7 +73,7 @@ from solver.scoba_types import SearchTree
 # Constants and file paths
 PARAM_FILES = ROOT / 'param_files'
 TRAVELTIME_EST = ROOT / "param_files" / "scoba_data.npz"
-PARAMS_FN      = str(PARAM_FILES / 'sf_bb_params.toml')
+PARAMS_FN      = str(PARAM_FILES / 'sf_bb_params_2dpts.toml')
 
 
 def parse_commandline():
@@ -105,8 +105,6 @@ def main():
 
     # Precompute city distributions
     city = parse_city_params(PARAMS_FN)
-    lat_dist = uniform(loc=city['lat_start'], scale=city['lat_end']-city['lat_start'])
-    lon_dist = uniform(loc=city['lon_start'], scale=city['lon_end']-city['lon_start'])
     baseline = args['baseline']
     log_dir = "dr{}_dep{}_probpt{}_win{}_{}".format(
         args['n_drones'], args['n_depots'],
@@ -136,14 +134,23 @@ def main():
     scoba_halton_tree = BallTree(points, metric="euclidean")
     travel_time_estimates = estimates
 
-    # Prepare drone depots
-    ALL_DEPOT_LOCS = [LatLonCoords(37.774524,-122.473656),
-                  LatLonCoords(37.751751,-122.410654),
-                  LatLonCoords(37.718779,-122.462401),
-                  LatLonCoords(37.789290,-122.426797),
-                  LatLonCoords(37.739611,-122.492203)]
 
-    DEPOT_LOCS = ALL_DEPOT_LOCS[:args['n_depots']]
+    depots = {
+        int(i+1): Depot(
+            depot_id=f"dp{i+1}",
+            location=LatLonCoords(lat=coords[0], lon=coords[1]),
+            capacity=5
+        )
+        for i, coords in enumerate([
+            (37.774524, -122.473656),
+            (37.751751, -122.410654),
+            (37.718779, -122.462401),
+            (37.789290, -122.426797),
+            (37.739611, -122.492203),
+        ][:args['n_depots']])
+    }
+
+
     # Results containers
     late_pkgs = []
     delivered_pkgs = []
@@ -158,21 +165,29 @@ def main():
     idx = 1
     n_per_depot = n_drones // n_depots
     remainder = n_drones % n_depots # incase odd number of drones
-    for d in range(1, n_depots + 1):
+    for depot_idx, depot in depots.items():
         # Give one extra drone to the first `remainder` depots
-        n_this_depot = n_per_depot + (1 if d <= remainder else 0)
+        n_this_depot = n_per_depot + (1 if depot_idx <= remainder else 0)
         for _ in range(n_this_depot):
             name = f'dn{idx}'; idx += 1
             drone_ordering.append(name)
             drone_set[name] = Drone(
                 drone_id=name,
-                depot_number=d,
-                depot_loc=DEPOT_LOCS[d - 1]
+                depot_number=depot_idx,
+                depot_loc=depot.location,
             )
     num_init = int(round(1.5 * args['n_drones'])) #request number
     
+    #  full - two depots
+    comms_dict = {
+        1: [2],
+        2: [1],
 
-    # full
+    }   
+
+
+
+    # # full
     # comms_dict = {
     #     1: [2,3,4,5],
     #     2: [1,3,4,5],
@@ -183,13 +198,13 @@ def main():
     # }
 
     # edge removed (1,2), T(G) = 2
-    comms_dict = {
-        1: [3,4,5],
-        2: [1,3,4,5],
-        3: [1,2,4,5],
-        4: [1,2,3,5],
-        5: [1,2,3,4]
-    }
+    # comms_dict = {
+    #     1: [3,4,5],
+    #     2: [1,3,4,5],
+    #     3: [1,2,4,5],
+    #     4: [1,2,3,5],
+    #     5: [1,2,3,4]
+    # }
     
     # edge removed (1,2), (3,1) T(G) = 3
     # comms_dict = {
@@ -217,7 +232,7 @@ def main():
     #     5: [1,2,3,4]
     # }
 
-    plot_comms_graph(comms_dict, DEPOT_LOCS, log_dir)
+    plot_comms_graph(comms_dict, depots, log_dir)
 
 
     # Run trials
@@ -290,19 +305,20 @@ def main():
                                         agent_prop_set=props,
                                         agent_ordering=drone_ordering,
                                         max_tasks_to_consider=20,
-                                        conflict_threshold=10)
-            sim = setup_routing_sim(
+                                        conflict_threshold=20)
+
+            sim = setup_routing_sim(server,
                 PARAMS_FN, scoba_halton_tree, travel_time_estimates,
                 num_init_requests=num_init,
                 new_request_prob=args['new_request_prob'],
                 time_window_duration=args['time_window'],
                 rng=rng,
-                depot_locs=DEPOT_LOCS,
+                depots=depots,
                 csv_logger=csv_logger,
                 in_transit_packages=in_transit_pkgs
             )
-            # plot_initial_map(
-            #     depot_locs=DEPOT_LOCS, drones=server.agent_set,
+            # plot_initial_map(city, 
+            #     depots=depots, drones=server.agent_set,
             #     package_dict=sim.active_packages,
             #     radius_km=sim.distance_thresh,
             #     trial=trial)
@@ -315,7 +331,7 @@ def main():
                 assign = bool(sim.active_packages)
                 if assign:
                     start_time = time.perf_counter()
-                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t, comms_dict=comms_dict)
+                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t, comms_dict=None)
                     end_time = time.perf_counter()
                     elapsed_time = end_time - start_time
                     timing_per_timestep.append(elapsed_time)

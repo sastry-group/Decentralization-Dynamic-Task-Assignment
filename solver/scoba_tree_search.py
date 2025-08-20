@@ -1,80 +1,114 @@
 # scoba_tree_search.py
 from collections import deque
+import math
 from typing import Any
 from solver.scoba_types import DecisionNode, OutcomeNode, SearchTree, InteractionEvent, MODE
 import logging
 
 
+
+def ensure_root(tree):
+    if not tree.nodes:
+        tree.nodes.append(DecisionNode(agent_name="", task_name="", attempt=False,
+                                       timeval=0.0, util=0.0, idx=0, utilset=True))
+        tree.parent_id[0] = 0
+        tree.child_ids[0] = []
+
 def insert_decision_node(tree: SearchTree, agent_name: str, ie: InteractionEvent,
                          parent_id: int, ref_time: float, utilval: float,
                          success_prob_fn) -> tuple[list[int], int]:
     """
-    Insert decision and outcome nodes into the search tree for a given interaction event.
-    Returns (new_outcome_leaves, new_decision_leaf).
-    """
-    idx = len(tree.nodes)
-    # Clamp reference time to event start
-    true_ref_time = max(ref_time, ie.timestamps[MODE.START])
-    assert true_ref_time <= ie.timestamps[MODE.FINISH], f"ref_time {ref_time} beyond event {ie.timestamps}"
+    Insert a new decision for interaction event `ie` under `parent_id`.
 
-    # Decision node for attempt
-    attempt_idx = idx
-    dnode1 = DecisionNode(agent_name=agent_name,
-                           task_name=ie.task_name,
-                           attempt=True,
-                           timeval=true_ref_time,
-                           util=0.0,
-                           idx=attempt_idx,
-                           utilset=False)
-    tree.nodes.append(dnode1)
+    Returns:
+        (new_outcome_leaves, new_decision_leaf_idx)
+    """
+
+    # Convenience: append node and return its new index (assumes tree.nodes[0] is dummy/root)
+    def _append(node):
+        idx = len(tree.nodes)
+        tree.nodes.append(node)
+        return idx
+    
+
+    # 1) True reference time is clamped to the event START
+    START, FINISH, RETURN = MODE.START, MODE.FINISH, MODE.RETURN
+    true_ref_time = max(ref_time, ie.timestamps[MODE.START])
+    assert true_ref_time <= ie.timestamps[MODE.FINISH], f"ref_time={ref_time} exceeds FINISH; ie={ie.timestamps}"
+
+    # 2) Create the two decision nodes (attempt / no-attempt), util initialized to 0
+    attempt_idx = _append(DecisionNode(
+        agent_name=agent_name,
+        task_name=ie.task_name,
+        attempt=True,
+        timeval=true_ref_time,
+        util=0.0,
+        idx=None,           # will set below if your class stores idx internally
+        utilset=False
+    ))
     tree.parent_id[attempt_idx] = parent_id
 
     # Decision node for no-attempt
-    no_attempt_idx = attempt_idx + 1
-    dnode2 = DecisionNode(agent_name=agent_name,
-                           task_name=ie.task_name,
-                           attempt=False,
-                           timeval=true_ref_time,
-                           util=0.0,
-                           idx=no_attempt_idx,
-                           utilset=False)
-    tree.nodes.append(dnode2)
+    no_attempt_idx = _append(DecisionNode(
+        agent_name=agent_name,
+        task_name=ie.task_name,
+        attempt=False,
+        timeval=true_ref_time,
+        util=0.0,
+        idx=None,
+        utilset=False
+    ))
     tree.parent_id[no_attempt_idx] = parent_id
+    new_decision_leaf = no_attempt_idx
+
+    # If nodes store their own id, set it now
+    if hasattr(tree.nodes[attempt_idx], "idx"):
+        tree.nodes[attempt_idx].idx = attempt_idx
+    if hasattr(tree.nodes[no_attempt_idx], "idx"):
+        tree.nodes[no_attempt_idx].idx = no_attempt_idx
+
+    # Parent now has two children: [attempt, no-attempt]
     tree.child_ids[parent_id] = [attempt_idx, no_attempt_idx]
 
-    # Outcome nodes under attempt
-    success_prob = success_prob_fn(ref_time, ie)
-    fail_idx = no_attempt_idx + 1
-    onode1 = OutcomeNode(agent_name=agent_name,
-                         task_name=ie.task_name,
-                         outcome=MODE.FINISH,
-                         timeval=ie.timestamps[MODE.FINISH],
-                         probability=1.0 - success_prob,
-                         util=0.0,
-                         idx=fail_idx,
-                         utilset=False)
-    tree.nodes.append(onode1)
+    # 3) Success probability from your callback (Julia uses ref_time, not true_ref_time)
+    success_prob = float(success_prob_fn(ref_time, ie))
+    success_prob = max(0.0, min(1.0, success_prob))  # clamp, just in case
+
+    # 4) Create outcome nodes under the "attempt" decision
+    fail_idx = _append(OutcomeNode(
+        agent_name=agent_name,
+        task_name=ie.task_name,
+        outcome=FINISH,  # failure realized at FINISH
+        timeval=ie.timestamps[FINISH],
+        probability=1.0 - success_prob,
+        util=0.0,        # leaf util gets set later in the backward pass
+        idx=None,
+        utilset=False
+    ))
     tree.parent_id[fail_idx] = attempt_idx
 
-    succ_idx = fail_idx + 1
-    onode2 = OutcomeNode(agent_name=agent_name,
-                         task_name=ie.task_name,
-                         outcome=MODE.RETURN,
-                         timeval=ie.timestamps[MODE.RETURN],
-                         probability=success_prob,
-                         util=utilval,
-                         idx=succ_idx,
-                         utilset=False)
-    tree.nodes.append(onode2)
+    succ_idx = _append(OutcomeNode(
+        agent_name=agent_name,
+        task_name=ie.task_name,
+        outcome=RETURN,  # success realized at RETURN
+        timeval=ie.timestamps[RETURN],
+        probability=success_prob,
+        util=utilval,    # immediate reward for success
+        idx=None,
+        utilset=False
+    ))
     tree.parent_id[succ_idx] = attempt_idx
-    tree.child_ids[attempt_idx] = [succ_idx, fail_idx]
-    logging.info(
-        f"[Outcome Added] Task {ie.task_name} — success_prob={success_prob:.4f}, "
-        f"utilval={utilval:.2f}, succ_time={ie.timestamps[MODE.RETURN]:.2f}, "
-        f"fail_time={ie.timestamps[MODE.FINISH]:.2f}, ref_time={ref_time:.2f}"
-    )
 
-    return [succ_idx, fail_idx], no_attempt_idx
+    if hasattr(tree.nodes[fail_idx], "idx"):
+        tree.nodes[fail_idx].idx = fail_idx
+    if hasattr(tree.nodes[succ_idx], "idx"):
+        tree.nodes[succ_idx].idx = succ_idx
+
+    # Children of the attempt decision are [success, fail]
+    tree.child_ids[attempt_idx] = [succ_idx, fail_idx]
+
+    new_outcome_leaves = [succ_idx, fail_idx]
+    return new_outcome_leaves, new_decision_leaf
 
 
 def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[str],
@@ -82,116 +116,162 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
     """
     Build or rebuild the search tree for a single agent based on tasks to consider.
     """
-    prop = server.agent_prop_set[agent_name]
-    tree = prop.tree
     if not tasks_to_consider:
-        tree.nodes.clear()
-        tree.parent_id.clear()
-        tree.child_ids.clear()
+        temp_tree = server.agent_prop_set[agent_name].tree
+        temp_tree.nodes.clear()
+        temp_tree.child_ids.clear()
+        temp_tree.parent_id.clear()
         return
+    
 
-    events = prop.interaction_events
-    considered_ie = [ie for ie in events if ie.task_name in tasks_to_consider]
-    task_summary = {} 
-    max_consider = min(len(considered_ie), server.max_tasks_to_consider)
-    outcome_leaf_idxs: set[int] = set()
-    decision_leaf_idxs: set[int] = set()
-    first_time = float('inf')
+    tree = server.agent_prop_set[agent_name].tree
+    interaction_events = server.agent_prop_set[agent_name].interaction_events
 
-    logging.debug(f"[SCoBA] Drone {agent_name} has {len(considered_ie)} interaction events. Using max {server.max_tasks_to_consider}")
+    outcome_leaf_idxs = set()
+    decision_leaf_idxs = set()
 
-    for ie in considered_ie[:max_consider]:
+    first_ie_stamp = math.inf
+
+    # Filter to packages in tasks_to_consider; keep original order or sort by START
+    considered_ie = [ie for ie in interaction_events if ie.task_name in tasks_to_consider]
+    num_to_consider = min(len(considered_ie), server.max_tasks_to_consider)
+    logging.info(f"[SCoBA] Agent {agent_name} considering {num_to_consider} tasks out of {len(considered_ie)}")
+    if num_to_consider == 0:
+        tree.clear()
+        return
+    
+    # Optional: be explicit about ordering by START (safe)
+    considered_ie = sorted(considered_ie[:num_to_consider], key=lambda ie: ie.timestamps[MODE.START])
+
+    for ie in considered_ie:
         ie_stamp = ie.timestamps[MODE.START]
-        # logging.info(f"[RewardCheck] Task {ie.task_name} reward={util_val_fn(ie):.2f}")
 
-        if ie_stamp < first_time:
-            # to initialize the tree
+
+        if ie_stamp < first_ie_stamp:
             utilval = util_val_fn(ie)
-            logging.info(f"[UtilCheck] Task first time {ie.task_name} → util={util_val_fn(ie):.2f}")
-            new_outs, new_dec = insert_decision_node(
+            new_outcomes, new_dec_leaf = insert_decision_node(
                 tree, agent_name, ie, 0, server.current_time, utilval, success_prob_fn
             )
-            outcome_leaf_idxs.update(new_outs)
-            decision_leaf_idxs.add(new_dec)
-            first_time = ie_stamp
+            for idx in new_outcomes:
+                outcome_leaf_idxs.add(idx)
+            decision_leaf_idxs.add(new_dec_leaf)
+            first_ie_stamp = ie_stamp
         else:
-            new_outs_all = set()
-            new_decs_all = set()
-            remove_outs = set()
-            remove_decs = set()
-            for ol in list(outcome_leaf_idxs):
-                onode = tree.nodes[ol]
-                if onode.timeval <= ie.timestamps[MODE.START] or onode.timeval >= ie.timestamps[MODE.FINISH] - downtime/2.0:
+            new_outcome_leaf_idxs = set()
+            new_decision_leaf_idxs = set()
+            outcome_leaves_to_rm = set()
+            decision_leaves_to_rm = set()
+
+            # Try inserting under current outcome leaves (non‑dominated checks)
+            for ol_idx in list(outcome_leaf_idxs):
+                onode = tree.nodes[ol_idx]
+                assert type(onode).__name__ == "OutcomeNode"
+
+                # If the outcome happens before this IE starts -> dominated, skip
+                if onode.timeval <= ie.timestamps[MODE.START]:
                     continue
+                # If this decision would finish too late (beyond FINISH - downtime/2), skip
+                if onode.timeval >= ie.timestamps[MODE.FINISH] - downtime/2.0:
+                    continue
+
+                # Non-dominated: add decision node below this outcome leaf
                 utilval = util_val_fn(ie)
-                # logging.info(f"[UtilCheck] Task {ie.task_name} → util={util_val_fn(ie):.2f}")
-                temp_outs, temp_dec = insert_decision_node(
-                    tree, agent_name, ie, ol, onode.timeval, utilval, success_prob_fn
+                temp_outcomes, temp_dec = insert_decision_node(
+                    tree, agent_name, ie, ol_idx, onode.timeval, utilval, success_prob_fn
                 )
-                remove_outs.add(ol)
-                new_outs_all.update(temp_outs)
-                new_decs_all.add(temp_dec)
-            for dl in list(decision_leaf_idxs):
-                dnode = tree.nodes[dl]
-                if dnode.timeval < ie.timestamps[MODE.FINISH] - downtime/2.0:
-                    utilval = util_val_fn(ie)
-                    temp_outs, temp_dec = insert_decision_node(
-                        tree, agent_name, ie, dl, dnode.timeval, utilval, success_prob_fn
-                    )
-                    remove_decs.add(dl)
-                    new_outs_all.update(temp_outs)
-                    new_decs_all.add(temp_dec)
-            outcome_leaf_idxs.difference_update(remove_outs)
-            outcome_leaf_idxs.update(new_outs_all)
-            decision_leaf_idxs.difference_update(remove_decs)
-            decision_leaf_idxs.update(new_decs_all)
-        task_summary[ie.task_name] = utilval
+                outcome_leaves_to_rm.add(ol_idx)
+                for to_idx in temp_outcomes:
+                    new_outcome_leaf_idxs.add(to_idx)
+                new_decision_leaf_idxs.add(temp_dec)
+
+            # Not-attempt is different from failing immediately; ensure paired growth
+            assert (len(new_decision_leaf_idxs) == 0) == (len(new_outcome_leaf_idxs) == 0)                
+
+            # Insert under current "no-attempt" decision leaves
+            for dec_idx in list(decision_leaf_idxs):
+                dnode = tree.nodes[dec_idx]
+                assert getattr(dnode, "attempt") is False
+                if dnode.timeval >= ie.timestamps[MODE.FINISH] - downtime/2.0:
+                    continue
+
+                utilval = util_val_fn(ie)
+                temp_outcomes, temp_dec = insert_decision_node(
+                    tree, agent_name, ie, dec_idx, dnode.timeval, utilval, success_prob_fn
+                )
+                decision_leaves_to_rm.add(dec_idx)
+                for to_idx in temp_outcomes:
+                    new_outcome_leaf_idxs.add(to_idx)
+                new_decision_leaf_idxs.add(temp_dec)
+
+            # Update leaf sets
+            outcome_leaf_idxs -= outcome_leaves_to_rm
+            outcome_leaf_idxs |= new_outcome_leaf_idxs
+
+            decision_leaf_idxs -= decision_leaves_to_rm
+            decision_leaf_idxs |= new_decision_leaf_idxs
 
 
-    
-    # if task_summary:
-    #     log_lines = [f"[SCoBA Summary] Drone {agent_name} considered {len(task_summary)} tasks:"]
-    #     for task, util in task_summary.items():
-    #         log_lines.append(f"  - Task {task}: utility={util:.2f}")
-    #     logging.info("\n".join(log_lines))
-    # else:
-    #     logging.info(f"[SCoBA Summary] Drone {agent_name} had no tasks to consider.")
-    # excluded = {ie.task_name for ie in events} - tasks_to_consider
-    # if excluded:
-    #     logging.info(f"[SCoBA Summary] Drone {agent_name} ignored {len(excluded)} tasks: {sorted(excluded)}")
+    # Backward pass: set utilities on leaves then bubble up to root
+    rev_fringe_idxs = set()
 
-    # for node in tree.nodes:
-    #     if isinstance(node, OutcomeNode):
-    #         logging.info(f"[Debug Outcome] Task {node.task_name} — util={node.util}, prob={node.probability}, timeval={node.timeval}")
+    # Outcome leaves: mark utilset (their .util already set by insert_decision_node normally)
+    for ol_idx in outcome_leaf_idxs:
+        ol_node = tree.nodes[ol_idx]
+        ol_node.utilset = True
+        rev_fringe_idxs.add(ol_idx)
 
-    reverse_fringe = set(outcome_leaf_idxs) | set(decision_leaf_idxs)
-    while reverse_fringe:
-        to_remove = set()
+    # Decision "no-attempt" leaves: util = 0
+    for dec_idx in decision_leaf_idxs:
+        dec_node = tree.nodes[dec_idx]
+        assert getattr(dec_node, "attempt") is False
+        dec_node.util = 0.0
+        dec_node.utilset = True
+        rev_fringe_idxs.add(dec_idx)
+
+    # Bubble up to set parent utilities
+    while rev_fringe_idxs:
+        to_rm = set()
         to_add = set()
-        for node_idx in list(reverse_fringe):
-            parent = tree.parent_id.get(node_idx, None)
-            if parent is None or parent == 0:
-                to_remove.add(node_idx)
+
+        for rfi in list(rev_fringe_idxs):
+            # Stop at root's children (parent_id == 0), remove from fringe
+            if tree.parent_id[rfi] == 0:
+                to_rm.add(rfi)
                 continue
-            siblings = tree.child_ids[parent]
-            if not all(s in reverse_fringe for s in siblings):
+
+            node = tree.nodes[rfi]
+            assert node.utilset is True, "Node in rev fringe does NOT have util set"
+
+            par_id = tree.parent_id[rfi]
+            par_node = tree.nodes[par_id]
+
+            # Only update parent when *all* its children are in the fringe (i.e., utilset ready)
+            siblings = tree.child_ids[par_id]
+            if not all(child in rev_fringe_idxs for child in siblings):
                 continue
-            node = tree.nodes[node_idx]
-            par_node = tree.nodes[parent]
-            if isinstance(node, OutcomeNode):
-                # logging.info(f"[Backup] Outcome for {node.task_name}, prob={node.probability:.4f}, util={node.util:.2f}")
-                par_node.util += node.probability * node.util
+
+            # Update parent util depending on child/parent types
+            if type(node).__name__ == "OutcomeNode":
+                # Parent is a decision node here: add expected utility
+                par_node.util = par_node.util + node.probability * node.util
             else:
-                temp = node.util + (1.0 if isinstance(par_node, OutcomeNode) and par_node.outcome == MODE.RETURN else 0.0)
-                par_node.util = max(par_node.util, temp)
-            to_add.add(parent)
-            to_remove.add(node_idx)
-        reverse_fringe.difference_update(to_remove)
-        reverse_fringe.update(to_add)
-        for idx in to_add:
-            tree.nodes[idx].utilset = True
+                # node is a DecisionNode
+                # If parent is outcome SUCCESS, add +1 then take best; else just take best
+                tmp_util = node.util
+                if type(par_node).__name__ == "OutcomeNode" and par_node.outcome == MODE.RETURN:
+                    tmp_util = 1.0 + node.util
+                par_node.util = max(tmp_util, getattr(par_node, "util", float("-inf")))
+
+            to_add.add(par_id)
+            to_rm.add(rfi)
+
+        for pid in to_add:
+            tree.nodes[pid].utilset = True
+
+        rev_fringe_idxs |= to_add
+        rev_fringe_idxs -= to_rm
     
-    # f
+
 def get_next_attempt_idx(tree: 'SearchTree') -> int:
     """
     Traverse decision tree preferring higher utility branches.
@@ -201,20 +281,39 @@ def get_next_attempt_idx(tree: 'SearchTree') -> int:
     if not tree.nodes:
         return -1
 
-    dq = deque([0])  # root node index
-    while dq:
-        top = dq.popleft()
-        children = tree.child_ids.get(top, [])
-        decs = [c for c in children if hasattr(tree.nodes[c], "attempt")]
-        if len(decs) != 2:
+    # Start BFS from the root (assumed index 0)
+    dec_fringe = deque([0])
+    subtree_root_dec = -1
+
+    while dec_fringe:
+        dec_top = dec_fringe.popleft()
+
+        children = tree.child_ids.get(dec_top, [])
+        # assert len(top_children) == 2, "Each decision node must have exactly two children"
+
+
+        if len(children) != 2:
+            # no children yet → keep scanning others
             continue
 
-        attempt_idx = next(c for c in decs if tree.nodes[c].attempt)
-        no_attempt_idx = next(c for c in decs if not tree.nodes[c].attempt)
+        c0, c1 = children
+        n0, n1 = tree.nodes[c0], tree.nodes[c1]
 
-        if tree.nodes[no_attempt_idx].util > tree.nodes[attempt_idx].util:
-            dq.append(no_attempt_idx)
+        def is_attempt(node): return hasattr(node, "attempt") and node.attempt is True
+        def is_dec(node):     return hasattr(node, "attempt")
+
+        if is_dec(n0) and is_dec(n1):
+            attempt_idx  = c0 if is_attempt(n0) else c1
+            no_attempt_idx = c1 if attempt_idx == c0 else c0
+
+            # If skipping yields higher util, keep going down that branch; else choose attempt here
+            if tree.nodes[no_attempt_idx].util > tree.nodes[attempt_idx].util:
+                dec_fringe.append(no_attempt_idx)
+            else:
+                subtree_root_dec = attempt_idx
+                # don’t descend further from here (mirrors Julia logic)
         else:
-            return attempt_idx
+            # Children aren’t both decisions (likely outcomes) → nothing to do here
+            continue
 
-    return -1
+    return subtree_root_dec

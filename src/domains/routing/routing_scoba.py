@@ -1,8 +1,9 @@
 import numpy as np
-from scipy.stats import norm  # placeholder for Epanechnikov
+from scipy.stats import gaussian_kde # placeholder for Epanechnikov
 from typing import Dict, List, Tuple, Any
-from collections import deque
+from collections import namedtuple
 import logging
+import math
 
 # Solver types
 from solver.scoba_types import DecisionNode, OutcomeNode, SearchTree, InteractionEvent, MODE
@@ -10,46 +11,98 @@ from solver.scoba_tree_search import generate_search_tree, get_next_attempt_idx
 from solver.scoba_conflict_resolution import SCoBAAlgorithm
 
 from domains.routing.routing_types import EuclideanLatLongMetric, convert_to_vector
-from domains.routing.routing_simulator import sample_true_delivery_return_time, get_travel_time_estimate, epanechnikov
+from domains.routing.routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes
 
 
-rng = np.random.RandomState(1345)
+TaskUtil = namedtuple("TaskUtil", ["task", "util"])
 
-def delivery_util(reward: float, ie: InteractionEvent) -> float:
+
+TRAVEL = dict(
+    avg_speed_km_per_min = 0.00777 * 60 / 1.2, # ~0.4662 km/min , just a scale factor to icnrease travel times
+    cv = 0.33,           # stdev = cv * mean   (tune 0.2–0.4 to taste)
+    dist = "epanechnikov"  # "epanechnikov" or "normal"
+)
+
+
+def delivery_util(reward: float, ie):
+    """Constant utility; included for API parity."""
     return reward
 
-def delivery_success_prob(std_scale: float, ref_time: float, ie: InteractionEvent) -> float:
+def delivery_util_vec(reward: float, ies):
+    """Vectorized: returns an array of rewards (one per event)."""
+    n = len(ies)
+    return np.full(n, reward, dtype=float)
 
-    start = max(ie.timestamps[MODE.START], ref_time)
-    time_remaining = ie.timestamps[MODE.FINISH] - start  # deadline - now
+def _epanechnikov_cdf_u(u):
+    """CDF of Epanechnikov kernel for standardized u in [-1,1]."""
+    u = np.asarray(u, dtype=float)
+    out = np.empty_like(u)
+    out[u <= -1] = 0.0
+    out[u >= 1]  = 1.0
+    mid = (u > -1) & (u < 1)
+    um = u[mid]
+    out[mid] = 0.5 + 0.75*(um - (um**3)/3.0)
+    return out
 
-    # expected duration (you need a nominal estimate — e.g., model/historical)
-    expected_duration = ie.travel_time  
-    sigma = max(1e-9, expected_duration / std_scale)
+def travel_time_mean_minutes(loc1, loc2) -> float:
+    v1, v2 = convert_to_vector(loc1), convert_to_vector(loc2)
+    dist_km = EuclideanLatLongMetric().evaluate(v1, v2)
+    mu = dist_km / TRAVEL["avg_speed_km_per_min"]
+    return max(math.ceil(mu), 3)
 
-    # travel_time = ie.timestamps[MODE.RETURN] - ie.timestamps[MODE.FINISH]
-    # mean = travel_time
-    # std_val = travel_time / std_scale
-    # tt_dist = epanechnikov(rng, mean, std_val)
-    return epanechnikov_cdf(time_remaining, expected_duration, sigma)
-
-
-def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
-    """
-    Compute the Epanechnikov CDF at x, with given mean and scale.
-    Support is [mean - sqrt(5)*scale, mean + sqrt(5)*scale].
-    """
-    sqrt5 = 5 ** 0.5
-    a = mean - sqrt5 * scale
-    b = mean + sqrt5 * scale
-
-    if x <= a:
+def cdf_travel_time(t_available: float, mu: float) -> float:
+    """P(T_out <= t_available) under the configured TRAVEL model."""
+    if t_available <= 0:
         return 0.0
-    elif x >= b:
-        return 1.0
+    cv = TRAVEL["cv"]
+    sigma = max(cv * mu, 1e-6)
+    if TRAVEL["dist"].lower() == "epanechnikov":
+        u = (t_available - mu) / sigma
+        return float(_epanechnikov_cdf_u(u))
+    elif TRAVEL["dist"].lower() == "normal":
+        # Normal CDF without importing scipy
+        z = (t_available - mu) / sigma
+        return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
     else:
-        z = (x - mean) / scale
-        return 0.75 * (z / sqrt5 - (z ** 3) / (3 * sqrt5 ** 3)) + 0.5
+        raise ValueError(f"Unknown TRAVEL['dist']: {TRAVEL['dist']}")
+
+
+def delivery_success_prob_common(
+    depot_loc,
+    pkg_loc,
+    ref_time: float,
+    ie
+) -> float:
+    """
+    Probability of delivering within the package's latest time,
+    if the drone attempts at max(ref_time, window start).
+    """
+    start_t  = ie.timestamps[MODE.START]
+    finish_t = ie.timestamps[MODE.FINISH]
+    attempt_t = max(ref_time, start_t)          # can't start before window OR before you're free
+    slack = finish_t - attempt_t                # time available to fly outbound
+    mu_out = travel_time_mean_minutes(depot_loc, pkg_loc)
+    return cdf_travel_time(slack, mu_out)
+
+
+def make_success_prob_fn(sim, server, drone_nm):
+    depot_loc = server.agent_set[drone_nm].depot_loc
+
+    def success_prob(ref_time, ie):
+        pkg_nm = getattr(ie, "task_name", None)
+        # Prefer active pkgs (tree is built over actives)
+        if pkg_nm in sim.active_packages:
+            pkg_loc = sim.active_packages[pkg_nm].delivery
+        elif pkg_nm in sim.busy_packages:
+            pkg_loc = sim.busy_packages[pkg_nm].delivery
+        else:
+            # Fallback: look up from server windows if needed
+            # (should rarely happen in tree generation)
+            return 0.0
+        return delivery_success_prob_common(depot_loc, pkg_loc, ref_time, ie)
+
+    return success_prob
+
 
 def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_id=None, time_step=None, comms_dict=None) -> None:
     """
@@ -58,178 +111,133 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
     """
     # 1) Group available drones by depot
     # logging.info(f"[t={server.current_time}] Starting SCoBA assignment...")
-    depots: Dict[int, List[str]] = {}
+    available_drones = {}  # depot_number -> [drone_names]
+    for drone_nm, dp in server.agent_prop_set.items():
+        drone = server.agent_set[drone_nm]
+        if dp.at_depot is True:
+            available_drones.setdefault(drone.depot_number, []).append(drone_nm)
+
+    # Diagnostics to send to CBA
+    task_util_allocation = {}       # drone_nm -> TaskUtil(task=<pkg_nm>, util=<value>)
+    all_considered_tasks = {}       # drone_nm -> set(pkg_nms)
+    assignment_util = 0.0
+
+
+    def util_val_fn(ie):
+        return routing_sim.delivery_reward
     
-    for dn, dp in server.agent_prop_set.items():
-        if dp.at_depot:
-            # logging.info(f"Drone {dn} at depot: {dp.at_depot}")
-            dnum = server.agent_set[dn].depot_number
-            depots.setdefault(dnum, []).append(dn)
-    # logging.info(f"Drones at depot information: {depots}")
+    # a factory the coordinator can call: given drone -> returns (ref_time, ie) -> prob
+    def success_prob_factory(drone_nm: str):
+        return make_success_prob_fn(routing_sim, server, drone_nm)
 
-    if csv_logger:
-        for depot_num, drones in depots.items():
-            depot_loc = server.agent_set[drones[0]].depot_loc
-            csv_logger.log("depot_drones.csv", {
-                "trial": trial_id,
-                "time": time_step,
-                "depot_id": depot_num,
-                "drone_ids": ";".join(drones),
-                "lat": depot_loc.lat,
-                "lon": depot_loc.lon,
-                "num_drones": len(drones),
-            })
+    # 2) Assign all available drones, grouped by depot
+    for depot_number, depot_drones in available_drones.items():
+        # Any drone from this depot has the same depot_loc
+        depot_loc = server.agent_set[depot_drones[0]].depot_loc
 
 
-    # utils
-    util_fn = lambda ie: delivery_util(routing_sim.delivery_reward, ie)
-    prob_fn = lambda ref, ie: delivery_success_prob(routing_sim.tt_est_std_scale, ref, ie)
-
-    # 2) Per-depot tree search
-    task_util_allocation = {}
-    all_considered = {}
-    for depot_num, drones in depots.items():
-        depot_loc = server.agent_set[drones[0]].depot_loc   
-
-        in_range = set()
-        for pkg, pp in routing_sim.active_packages.items():
+        # Find packages in range of this depot
+        pkgs_in_range = set()
+        for pkg_nm, pp in routing_sim.active_packages.items():
             dist = EuclideanLatLongMetric().evaluate(
                 convert_to_vector(depot_loc), convert_to_vector(pp.delivery)
             )
             if dist <= routing_sim.distance_thresh:
-                approx_travel_time = get_travel_time_estimate(
-                    routing_sim.halton_nn_tree,
-                    depot_loc,
-                    pp.delivery,
-                    routing_sim.estimate_matrix,
-                    routing_sim.time_scale
-                )
-                
-                pp.approx_travel_times[depot_num] = approx_travel_time 
-                in_range.add(pkg)
-                if csv_logger:
-                    csv_logger.log("depot_package_distances.csv", {
-                        "trial": trial_id,
-                        "time": time_step,
-                        "depot_id": depot_num,
-                        "pkg_id": pkg,
-                        "pkg_lat": pp.delivery.lat,
-                        "pkg_lon": pp.delivery.lon,
-                        "depot_lat": depot_loc.lat,
-                        "depot_lon": depot_loc.lon,
-                        "distance": dist,
-                        "approx_travel_time": approx_travel_time,
-                    })
+                pkgs_in_range.add(pkg_nm)
+
+
+        depot_assigned_pkgs = set()
+        # Priority ordering among drones from the same depot
+        for drone_nm in depot_drones:
+            # Exclude already tentatively assigned packages (from this depot)
+            pkgs_to_consider = pkgs_in_range - depot_assigned_pkgs
         
+            sp_fn = success_prob_factory(drone_nm)
+            # Generate the single-agent search tree
+            # Build the single-agent tree
+            generate_search_tree(
+                server,
+                drone_nm,
+                pkgs_to_consider,
+                sp_fn,              # <-- success prob callable: (ref_time, ie) -> [0,1]
+                util_val_fn,
+                server.current_time 
+            )
+            tree = server.agent_prop_set[drone_nm].tree
 
-        assigned_pkgs = set()
-        for dn in drones:
-            choices = in_range - assigned_pkgs
-            generate_search_tree(server, dn, choices, prob_fn, util_fn, 0.0)
+            if tree:  # not empty
+                dec_idx = get_next_attempt_idx(tree)
+                if dec_idx != -1:
+                    dec_node = tree.nodes[dec_idx]
+                    # Tentatively mark this package as taken by a drone from this depot
+                    depot_assigned_pkgs.add(dec_node.task_name)
 
-            tree = server.agent_prop_set[dn].tree
-            att, skip = tree.child_ids.get(0, (None, None))
-            if att is not None and skip is not None:
-                a_util = tree.nodes[att].util
-                s_util = tree.nodes[skip].util
-            if tree and tree.nodes:
-                # logging.info(f"[Tree] Drone {dn}: Tree has {len(tree.nodes)} nodes.")
+                    # Record diagnostics for coordination step
+                    assignment_util += dec_node.util
+                    task_util_allocation[drone_nm] = TaskUtil(task=dec_node.task_name, util=dec_node.util)
+                    all_considered_tasks[drone_nm] = set(pkgs_to_consider)
 
-                # Log final utility per task
-                task_utils = {}
-                for node in tree.nodes:
-                    if isinstance(node, DecisionNode) and node.attempt:
-                        task = node.task_name
-                        task_utils[task] = max(task_utils.get(task, float('-inf')), node.util)
-                        # logging.info(f"[Tree] Drone {dn}: Task '{task}' has utility {node.util:.2f}")
-
-                idx = get_next_attempt_idx(tree)
-                if idx != -1:
-                    node = tree.nodes[idx]
-                    init_util = None
-                    ie_summary = server.agent_prop_set[dn].interaction_events
-                    for ie in ie_summary:
-                        if ie.task_name == node.task_name:
-                            init_util = util_fn(ie)
-                            break
-
-                    pkg, util = node.task_name, node.util
-                    assigned_pkgs.add(pkg)
-                    task_util_allocation[dn] = (pkg, util)
-                    all_considered[dn] = choices
-                    
-                
-
-
+    # 3) Resolve conflicts across depots via SCoBA coordination                
     if task_util_allocation:
-        coord = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
-        true_alloc = coord.coordinate_allocation(
+        scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
+        true_task_util_allocation = scoba_alg.coordinate_allocation(
             task_util_allocation,
-            all_considered,
-            sum(u for (_, u) in task_util_allocation.values()),
-            prob_fn,
-            util_fn,
-            0.0
+            all_considered_tasks,
+            assignment_util,
+            success_prob_factory,
+            util_val_fn,
+            0.0,
         )
-        # logging.info(f"[Time {server.current_time}] Final SCoBA allocation: {true_alloc}")
-        available_drones = list(task_util_allocation.keys())
-        unused_drones = [dn for dn in available_drones if dn not in true_alloc]
-        logging.info(f"[SCoBA] Unused drones at t={server.current_time}: {unused_drones}")
-        
-        for dn, (pkg, _) in true_alloc.items():
 
-            if pkg in routing_sim.busy_packages:
-                # logging.warning(f"Drone {dn} lost allocation for {pkg} (already taken)")
-                continue
-            else:
-                server.agent_task_allocation[dn] = (pkg, float("inf"))
+        # there might be redundancies in true_task_util_allocation, ignore them.
+        for drone_nm, pkg_util in true_task_util_allocation.items():
+            # Defensive access whether it's a namedtuple/object/dict
+            pkg_nm = pkg_util.task
+            depot_loc = server.agent_set[drone_nm].depot_loc
+            # Ensure drone isn't already assigned
+            assert drone_nm not in server.agent_task_allocation
+
+            if pkg_nm not in routing_sim.busy_packages:
+                # Assign (drone -> package) with time = Inf (unknown attempt time placeholder)
+                server.agent_task_allocation[drone_nm] =  (pkg_nm, float("inf"))
+
+
+                window = routing_sim.active_packages[pkg_nm].time_window
+                delivery_location = routing_sim.active_packages[pkg_nm].delivery
                 td, rt = sample_true_delivery_return_time(
-                    server.agent_task_windows[(dn, pkg)],
-                    server.current_time,
-                    routing_sim.tt_est_std_scale,
-                    rng,
-                )
-                routing_sim.true_delivery_return[(dn, pkg)] = (td, rt)
-                server.agent_prop_set[dn].at_depot = False
-                server.agent_prop_set[dn].current_package = pkg
-                
-                routing_sim.busy_packages[pkg] = routing_sim.active_packages.pop(pkg)
-                routing_sim.num_active_packages -= 1
-                if csv_logger:
-                    dp = server.agent_prop_set[dn]
-                    agent = server.agent_set[dn]
-                    ie = next(
-                        (e for e in dp.interaction_events if e.task_name == pkg), 
-                        None
+                        depot_loc,
+                        delivery_location,
+                        window,
+                        server.current_time,
+                        rng,
                     )
-                    depot_num = server.agent_set[dn].depot_number
-                    approx_tt = routing_sim.busy_packages[pkg].approx_travel_times.get(depot_num)
+                routing_sim.true_delivery_return[(drone_nm, pkg_nm)] = (td, rt)
 
+                # Update drone state
+                server.agent_prop_set[drone_nm].at_depot = False
+                server.agent_prop_set[drone_nm].current_package = pkg_nm
+
+                # Move package from active -> busy
+                new_busy_package = routing_sim.active_packages[pkg_nm]
+                routing_sim.busy_packages[pkg_nm] = new_busy_package
+                routing_sim.active_packages.pop(pkg_nm, None)
+                routing_sim.num_active_packages -= 1
+                depot_number = server.agent_set[drone_nm].depot_number
+
+                if csv_logger:
                     csv_logger.log("drone_assignment.csv",
                     {
                         "trial": trial_id,
                         "time": time_step,
-                        "time_assigned": server.current_time,
-                        "drone_id": dn,
-                        "depot_id": depot_num,
-                        "pkg_id": pkg,
-                        # "at_depot": dp.at_depot,
-                        "agent_tw_earliest_time": server.agent_task_windows[(dn, pkg)][0],
-                        "agent_tw_latest_time": server.agent_task_windows[(dn, pkg)][1],
-                        "agent_tw_avail": server.agent_task_windows[(dn, pkg)][2],
-                        # "lat": agent.depot_loc.lat,
-                        # "lon": agent.depot_loc.lon,
-                        "reward": delivery_util(routing_sim.delivery_reward, ie) if ie else None,
+                        "drone_id": drone_nm,
+                        "depot_number": depot_number,
+                        "pkg_id": pkg_nm,
+                        "pkg_earliest_time": server.agent_task_windows[(drone_nm, pkg_nm)][0],
+                        "pkg_latest_time": server.agent_task_windows[(drone_nm, pkg_nm)][1],
+                        "agent_tw_avail": server.agent_task_windows[(drone_nm, pkg_nm)][2],
                         "true_return_time": rt,
                         "true_delivery_time": td,
-                        "success_prob": delivery_success_prob(
-                            routing_sim.tt_est_std_scale,
-                            server.current_time,    
-                            ie) if ie else None,
-                        "approx_travel_time": approx_tt,
+                        "approx_travel_time": routing_sim.busy_packages[pkg_nm].approx_travel_times.get(depot_number),
                         "true_travel_time": rt-td
                         }
                     )
-        logging.info(f"[INFO] SCoBA assigned {len(true_alloc)} drones at t={server.current_time}")
-    logging.info(f"[t={server.current_time}] SCoBA assignment finished with {len(server.agent_task_allocation)} total assignments.")           
-        

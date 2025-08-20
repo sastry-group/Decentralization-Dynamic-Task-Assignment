@@ -7,127 +7,124 @@ import numpy as np
 from scipy.stats import uniform
 from sklearn.neighbors import BallTree
 from typing import Tuple
-from typing import Any, List
+from typing import Any, List, Dict
 import logging
 
 from .routing_types import LatLonCoords, Package, CurrDroneSiteLocs, CityParams, parse_city_params
 from .routing_types import convert_to_vector, EuclideanLatLongMetric
 from solver.scoba_types import InteractionEvent, MODE
 
-rng_int = np.random.default_rng(1345)
+TRAVEL = dict(
+    avg_speed_km_per_min = 0.00777 * 60 / 1.2, # ~0.4662 km/min , just a scale factor to icnrease travel times
+    cv = 0.33,           # stdev = cv * mean   (tune 0.2–0.4 to taste)
+    dist = "epanechnikov"  # "epanechnikov" or "normal"
+)
 
-def get_travel_time_estimate(halton_nn_tree: BallTree,
-                             loc1: LatLonCoords,
-                             loc2: LatLonCoords,
-                             estimate_matrix: np.ndarray,
-                             time_scale: float, csv_logger=None) -> float:
-    """
-    Lookup nearest neighbor travel time estimate, fallback to Euclidean distance / speed.
-    """
-    v1 = convert_to_vector(loc1)
-    v2 = convert_to_vector(loc2)
-    # _, idx1 = halton_nn_tree.query([v1], k=1)
-    # _, idx2 = halton_nn_tree.query([v2], k=1)
-    # i1, i2 = idx1[0][0], idx2[0][0]
-    # tt = estimate_matrix[i1, i2] / 60  #this is in seconds, convert to minutes
+def travel_time_mean_minutes(loc1: LatLonCoords, loc2: LatLonCoords) -> float:
+    v1, v2 = convert_to_vector(loc1), convert_to_vector(loc2)
     dist_km = EuclideanLatLongMetric().evaluate(v1, v2)
-    # Assume avg_speed = 0.00777 km/sec (i.e., 7.77 m/s)
-    speed_km_per_min = 0.00777 * 60  # ~0.4662 km/min
-
-    travel_time_min = math.ceil(dist_km / speed_km_per_min)
-    # if tt == 0.0:
-    #     dist = EuclideanLatLongMetric().evaluate(v1, v2)
-    #     tt = dist / 0.00777
-    # csv_logger.log("travel_time_estimates.csv", {
-    #     "from_lat": loc1.lat,
-    #     "from_lon": loc1.lon,
-    #     "to_lat": loc2.lat,
-    #     "to_lon": loc2.lon,
-    #     "estimate": travel_time_min,
-    # })
-    # print(f"Travel time estimate from {loc1} to {loc2} output:  {tt / time_scale}")
-    return travel_time_min
+    mu = dist_km / TRAVEL["avg_speed_km_per_min"]
+    return max(math.ceil(mu), 3)  # keep your floor of 3 min
 
 
-def generate_package_request(pkg_name, lat_dist: uniform,
-                             lon_dist: uniform,
-                             current_time: float,
-                             tw_duration: float,
-                             rng: np.random.Generator, 
-                             depot_locs: List[LatLonCoords],
+
+def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
+                             current_time: float, tw_duration: float, 
+                             rng: np.random.Generator,
+                             depots: dict[str,List[LatLonCoords]],
                              dist_thresh: float,
                              csv_logger=None) -> Package:
-    """
-    Create a random package delivery request.
-    """
-
     lat = lat_dist.rvs(random_state=rng)
     lon = lon_dist.rvs(random_state=rng)
     delivery = LatLonCoords(lat=lat, lon=lon)
+
+    approx_travel_times = {}
+    distance_dict = {}
+    for depot_idx, depot in depots.items():
+        mu_tt = travel_time_mean_minutes(depot.location, delivery)  # unified deterministic mean
+        approx_travel_times[depot_idx] = mu_tt
+        dist_km = EuclideanLatLongMetric().evaluate(depot.location, delivery)
+        distance_dict[depot_idx] =  dist_km
+
+    # Pick window length relative to nearest depot mean
+    mu_nearest = min(approx_travel_times.values())
+    k_low, k_high = 0.8, 1.6
+    duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
     start = round(current_time + rng.uniform(tw_duration // 2, tw_duration))
-    duration = round(rng.uniform(tw_duration // 2, tw_duration))
     window = (start, start + duration)
-    pkg = Package(delivery=delivery, time_window=window)
+
+    pkg = Package(
+        name=pkg_name,
+        delivery=delivery,
+        time_window=window,
+        approx_travel_times=approx_travel_times,
+        distance_to_depots=distance_dict
+    )
+
+    if csv_logger:
+        csv_logger.log("pkg_gen_info.csv",{
+            "pkg_id": pkg_name,
+            "lat": lat, "lon": lon,
+            "start": window[0], "end": window[1],
+            "duration": duration,
+            **{f"mu_depot_{i}": mu for i, mu in approx_travel_times.items()},
+            **{f"dist_depot_{i}": dist for i, dist in distance_dict.items()}
+        })
+
     return pkg
-    # while True:
-    #     lat = lat_dist.rvs(random_state=rng)
-    #     lon = lon_dist.rvs(random_state=rng)
-    #     delivery = LatLonCoords(lat=lat, lon=lon)
-
-    #     for depot in depot_locs:
-    #         dist = EuclideanLatLongMetric().evaluate(
-    #             convert_to_vector(delivery),
-    #             convert_to_vector(depot)
-    #         )
-    #         if dist <= (dist_thresh - 0.4):
-    #             start = current_time + rng_int.integers(tw_duration // 2, tw_duration + 1)
-    #             length = round(rng.uniform(tw_duration, tw_duration * 2))
-    #             window = (start, start + length)
-    #             return Package(delivery=delivery, time_window=window)
 
 
 
+def sample_true_travel_time(mu: float, rng: np.random.Generator) -> float:
+    sigma = max(TRAVEL["cv"] * mu, 1e-6)
+    if TRAVEL["dist"] == "epanechnikov":
+        # u ~ Epanechnikov with Var(u)=1 using the sqrt(5) trick; std = sigma
+        sqrt5 = 5 ** 0.5
+        while True:
+            u = rng.uniform(-sqrt5, sqrt5)
+            if rng.uniform() <= 0.75 * (1 - (u / sqrt5) ** 2):
+                return max(1.0, round(mu + u * sigma))
+    elif TRAVEL["dist"] == "normal":
+        return max(1.0, round(rng.normal(mu, sigma)))
+    else:
+        raise ValueError("Unknown TRAVEL['dist']")
 
 
 
 
-def epanechnikov(rng, mean, scale):
-    # use acceptance–rejection to sample Epanechnikov(-1,1) then scale+shift
-    sqrt5 = 5 ** 0.5
-    while True:
-        u = rng.uniform(-sqrt5, sqrt5)
-        if rng.uniform() <= 0.75 * (1 - (u / sqrt5) ** 2):  # normalize for correct shape
-            return mean + u * scale
-
-
-def sample_true_delivery_return_time(drone_pkg_window: Tuple[float,float,float],
-                                     current_time: float,
-                                     std_scale: float,
-                                     rng: np.random.Generator) -> Tuple[float,float]:
+def sample_true_delivery_return_time(
+    depot_loc: LatLonCoords,
+    delivery_loc: LatLonCoords,
+    window: Tuple[float, float],
+    current_time: float,
+    rng: np.random.Generator
+) -> Tuple[float, float]:
     """
-    Sample true delivery and return times with uncertainty.
+    Sample true delivery time (arrive at customer) and true return time (back to depot),
+    using the same uncertainty model as everywhere else.
     """
-    # print(f"Sampling true delivery and return time for window {drone_pkg_window} at current time {current_time}")
-    travel_time = drone_pkg_window[2] - drone_pkg_window[1]
-    # print(f"Travel time estimate: {travel_time} minutes")
-    mean = travel_time 
-    scale = travel_time / std_scale 
-    # delta = rng.normal(loc=mean, scale=scale)
-    # td = max(current_time + delta, drone_pkg_window[0])
-    # rt = math.ceil(td) + rng.normal(loc=mean, scale=scale)
-    ep = epanechnikov(rng, mean, scale)  # sample from Epanechnikov distribution
-    td = round(current_time + ep)
+    mu_out = travel_time_mean_minutes(depot_loc, delivery_loc)
+    mu_back = travel_time_mean_minutes(delivery_loc, depot_loc)
 
-    # print(f"current {current_time}, drone window start {drone_pkg_window[0]}, travel mean {mean}, epanechnikov output {ep} with scale {scale}, td {td}")
-    td = max(td, drone_pkg_window[0]) # ensuring the delivery time is not before the start of the time window
-    rt = td + math.ceil(ep)
+    # sample both legs with the same distribution family & CV
+    tt_out = sample_true_travel_time(mu_out, rng)
+    tt_back = sample_true_travel_time(mu_back, rng)
+
+    # depart immediately; arrive at
+    td = round(current_time + tt_out)
+    # respect time window start: wait if early
+    td = max(td, window[0])
+
+    # return after (waiting does not reduce flight time)
+    rt = round(td + tt_back)
+
+    return td, rt
 
 
-    return td, rt   
 
-
-def setup_routing_sim(params_fn: str,
+def setup_routing_sim(server, params_fn: str,
                       halton_nn_tree: BallTree,
+                    
                       estimate_matrix: np.ndarray,
                       num_init_requests: int = 5,
                       new_request_prob: float = 0.75,
@@ -135,7 +132,7 @@ def setup_routing_sim(params_fn: str,
                       time_window_duration: float = 30.0,
                       in_transit_packages: dict[str, Package] = None,
                       rng: np.random.Generator = None,
-                      depot_locs: List[LatLonCoords] = None,
+                      depots: Dict[str, List[LatLonCoords]] = None,
                       csv_logger=None) -> 'RoutingSimulator':
     """
     Initialize a routing simulator environment with random initial packages.
@@ -152,13 +149,13 @@ def setup_routing_sim(params_fn: str,
         # improve this to get te eactual distance_threshh
         pkg = generate_package_request(name, lat_dist, lon_dist, 0.0, 
                                        time_window_duration, rng, 
-                                       depot_locs=depot_locs, dist_thresh=5 ,
+                                       depots=depots, dist_thresh=5 ,
                                        csv_logger=csv_logger)
         active_packages[name] = pkg
 
 
     from .routing_types import RoutingSimulator
-    return RoutingSimulator(
+    sim = RoutingSimulator(
         current_time=0.0,
         city_params=city,
         new_request_prob=new_request_prob,
@@ -170,8 +167,14 @@ def setup_routing_sim(params_fn: str,
         num_total_packages=num_init_requests,
         num_active_packages=num_init_requests,
         in_transit_packages=in_transit_packages,
-        depot_locs=depot_locs if depot_locs else {},
+        depots=depots if depots else {},
     )
+    for drone_nm, props in server.agent_prop_set.items():
+        props.available_at = 0.0
+        props.at_depot = True
+        props.current_package = ""
+
+    return sim
 
 
 def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=None) -> None:
@@ -181,211 +184,221 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
     logging.debug(f"[Time Step] Advancing to t={sim.current_time}")
     if rng is None:
         rng = np.random.default_rng()
+
+    # First update the simulator and server time
     old_time = sim.current_time
-    
     sim.current_time += 1
     server.current_time += 1
 
-    drone_locs = []
-    site_locs = []
+    curr_drone_locs_cols = []  # List[Tuple[LatLonCoords, str]]
+    curr_sites_locs_cols = []  # List[Tuple[LatLonCoords, str]]
 
-    to_remove_alloc = set()
-    to_remove_busy = set()
-    to_remove_done = set()
+    # 2) Simulate any true pickups and dropoffs
+    keys_to_del = set()            # Set[Tuple[str, str]]
+    busy_packages_to_del = set()   # Set[str]
+    done_packages_to_del = set()   # Set[str]
 
-    # print(f"Current time: {sim.current_time}, Active packages: {sim.num_active_packages}, Total packages: {sim.num_total_packages}")
-    for dn, (pkg, _) in list(server.agent_task_allocation.items()):
-        delivery, ret = sim.true_delivery_return[(dn, pkg)]
-        logging.info(f"Drone {dn} has package {pkg} with true delivery {delivery} and return {ret}, the window is {server.agent_task_windows[(dn, pkg)]}")
+
+    for drone_nm, v in list(server.agent_task_allocation.items()):
+        package_nm, _ = v
+        flag = "None"
+
+        delivery, return_time = sim.true_delivery_return[(drone_nm, package_nm)]
+
+        logging.info(f"Drone {drone_nm} has package {package_nm} with true delivery {delivery} and return {return_time}, the window is {server.agent_task_windows[(drone_nm, package_nm)]}")
 
         # triggering only if deliveries are happening in this time step
         # For pickup, assign package to drone and mark package inactive
-        if old_time < delivery <= sim.current_time:
-            # print("Checking, sim time", sim.current_time, "delivery time", delivery)
-            dp = server.agent_prop_set[dn]
-            dp.current_package = ""
-            dp.at_depot = False  
+        if (delivery > old_time) and (delivery <= sim.current_time):
+            server.agent_prop_set[drone_nm].current_package = ""
+            server.agent_prop_set[drone_nm].at_depot = False  # For good measure
+
+
             # print("sim", sim.busy_packages[pkg])
-            if delivery <= sim.busy_packages[pkg].time_window[1]:
-                on_time = True
+
+            # Check on-time vs late
+            if delivery <= sim.busy_packages[package_nm].time_window[1]:
                 sim.delivered_packages += 1
-                drone_locs.append((sim.busy_packages[pkg].delivery, 'green'))
-                logging.info(f"[Delivery] t={sim.current_time} | Drone {dn} delivered pkg {pkg} on time")
+                logging.info(f"{drone_nm} has delivered {package_nm}!")
+                # Drone is green and at package location
+                flag = "True"
+                curr_drone_locs_cols.append((sim.busy_packages[package_nm].delivery, "green"))
             else:
                 sim.late_packages += 1
-                on_time = False
-                drone_locs.append((sim.busy_packages[pkg].delivery, 'red'))
-                logging.info(f"[Delivery] t={sim.current_time} | Drone {dn} delivered pkg {pkg} late")
-            to_remove_busy.add(pkg)
+                logging.info(f"{package_nm} was not delivered in time!")
+                # Drone is red and at package location
+                flag = "False"
+                curr_drone_locs_cols.append((sim.busy_packages[package_nm].delivery, "red"))
             
             if csv_logger:
                 # pkg_window = server.agent_task_windows[(dn, pkg)]
                 csv_logger.log("final_deliveries.csv", {
                     "trial": getattr(sim, "trial_id", None),
                     "timestep": sim.current_time,
-                    "drone_id": dn,
-                    "pkg_id": pkg,
+                    "drone_id": drone_nm,
+                    "pkg_id": package_nm,
                     "actual_delivery_time": delivery,
-                    "deadline": sim.busy_packages[pkg].time_window[1],
-                    "on_time": on_time,
-                    # "window_start": pkg_window[0],
-                    # "window_success": pkg_window[2],
-                    # "depot_lat": server.agent_set[dn].depot_loc.lat,
-                    # "depot_lon": server.agent_set[dn].depot_loc.lon,
-                    # "delivery_lat": sim.busy_packages[pkg].delivery.lat,
-                    # "delivery_lon": sim.busy_packages[pkg].delivery.lon,
+                    "deadline": sim.busy_packages[package_nm].time_window[1],
+                    "on_time": flag,
                 })
 
-            sim.done_packages[pkg] = Package(
-                delivery=sim.busy_packages[pkg].delivery,
-                time_window=sim.busy_packages[pkg].time_window)
-            logging.debug(f"sim done packages{sim.done_packages[pkg]}")
-            sim.sum_of_delivery_time += (delivery - server.agent_task_windows[(dn, pkg)][0])
+            busy_packages_to_del.add(package_nm)
+            sim.done_packages[package_nm] = sim.busy_packages[package_nm]
+
+            # Increment loss with difference from start of window
+            sim.sum_of_delivery_time += delivery - server.agent_task_windows[(drone_nm, package_nm)][0]
+
             logging.debug(
-                f"[Delivery] t={sim.current_time} | Drone {dn} delivered pkg {pkg} "
-                f"at {delivery:.2f}, deadline={sim.busy_packages[pkg].time_window[1]:.2f}, "
-                f"on_time={delivery <= sim.busy_packages[pkg].time_window[1]}"
+                f"[Delivery] t={sim.current_time} | Drone {drone_nm} delivered pkg {package_nm} "
+                f"at {delivery:.2f}, deadline={sim.busy_packages[package_nm].time_window[1]:.2f}, "
+                f"on_time={delivery <= sim.busy_packages[package_nm].time_window[1]}"
             )
         # For dropoff, free up drone and setup deletion of (drone,package) keys
-        elif old_time < ret <= sim.current_time:
-            server.agent_prop_set[dn].at_depot = True
-            to_remove_alloc.add((dn, pkg))
-            drone_locs.append((server.agent_set[dn].depot_loc, 'blue'))
-            to_remove_done.add(pkg)
-            logging.debug(f"[Return] t={sim.current_time} | Drone {dn} returned after delivering {pkg} at ret={ret:.2f}")
+        # Return to depot occurred here
+        elif (return_time > old_time) and (return_time <= sim.current_time):
+            server.agent_prop_set[drone_nm].at_depot = True
+            server.agent_prop_set[drone_nm].available_at = return_time  # <-- add
+            server.agent_prop_set[drone_nm].current_package = ""  
+            keys_to_del.add((drone_nm, package_nm))
+            logging.info(f"{drone_nm} back at depot!")
+            done_packages_to_del.add(package_nm)
+
+            # Drone is blue and at depot
+            curr_drone_locs_cols.append((server.agent_set[drone_nm].depot_loc, "blue"))
+
         else:
+            # NOTE: Hacky plotting interpolation
             # if pkg in sim.busy_packages or pkg in sim.done_packages:
-            if pkg not in sim.busy_packages and pkg not in sim.done_packages:
-                logging.warning(f"[t={sim.current_time}] Package {pkg} not found in busy or done — skipping.")
+            if (package_nm not in sim.busy_packages) and (package_nm not in sim.done_packages):
                 continue
-            depot = server.agent_set[dn].depot_loc
+            depot_loc = server.agent_set[drone_nm].depot_loc
             
             if sim.current_time < delivery:
-                pp_loc = sim.busy_packages[pkg].delivery
-
-                max_diff = max(delivery, ret - delivery)
-                interp_factor = (delivery - sim.current_time) / max_diff
-                new_lat = depot.lat + (1 - interp_factor) * (pp_loc.lat - depot.lat)
-                new_lon = depot.lon + (1 - interp_factor) * (pp_loc.lon - depot.lon)
+                # Interpolate depot -> delivery
+                pp_loc = sim.busy_packages[package_nm].delivery
+                maxdiff = max(delivery, (return_time - delivery))
+                interp_factor = (delivery - sim.current_time) / maxdiff if maxdiff != 0 else 0.0
+                new_lat = depot_loc.lat + (1.0 - interp_factor) * (pp_loc.lat - depot_loc.lat)
+                new_lon = depot_loc.lon + (1.0 - interp_factor) * (pp_loc.lon - depot_loc.lon)
             else:
-                if pkg not in sim.done_packages:
-                    logging.warning(f"[t={sim.current_time}] Package {pkg} not found in done_packages — skipping.")
-                    continue
+                # Interpolate delivery -> depot
+                pp_loc = sim.done_packages[package_nm].delivery
+                denom = (return_time - delivery)
+                interp_factor = (return_time - sim.current_time) / denom if denom != 0 else 0.0
+                new_lat = depot_loc.lat + (interp_factor) * (pp_loc.lat - depot_loc.lat)
+                new_lon = depot_loc.lon + (interp_factor) * (pp_loc.lon - depot_loc.lon)
 
-                pp_loc = sim.done_packages[pkg].delivery
-
-                max_diff = max(delivery, ret - delivery)
-                interp_factor = (ret - sim.current_time) / max_diff
-                new_lat = depot.lat + interp_factor * (pp_loc.lat - depot.lat)
-                new_lon = depot.lon + interp_factor * (pp_loc.lon - depot.lon)
-                # pp_loc = sim.done_packages[pkg].delivery
-                # interp_factor = (ret - sim.current_time)/(ret - delivery)
-                # new_lat = depot.lat + (interp_factor)*(pp_loc.lat - depot.lat)
-                # new_lon = depot.lon + (interp_factor)*(pp_loc.lon - depot.lon)
-
-            drone_locs.append((LatLonCoords(lat=new_lat, lon=new_lon), 'blue'))
+            curr_drone_locs_cols.append((type(depot_loc)(lat=new_lat, lon=new_lon), "blue"))
 
 
-    # Delete bookkeeping keys for dropped off package
-    for dn, pkg in to_remove_alloc:
-        del sim.true_delivery_return[(dn, pkg)]
-        del server.agent_task_windows[(dn, pkg)]
-        del server.agent_task_allocation[dn]
-    for pkg in to_remove_busy:
-        del sim.busy_packages[pkg]
-    for pkg in to_remove_done:
-        if pkg in sim.done_packages:
-            del sim.done_packages[pkg]
+    # Delete bookkeeping keys for dropped-off package
+    for k in keys_to_del:
+        sim.true_delivery_return.pop(k, None)
+        server.agent_task_windows.pop(k, None)
+        # Only delete the agent key from allocation
+        server.agent_task_allocation.pop(k[0], None)
 
-    expired = [p for p, rp in sim.active_packages.items() if rp.time_window[1] <= sim.current_time]
-    for p in expired:
-        logging.debug(f"[Expired] t={sim.current_time} | Package {p} expired at {sim.active_packages[p].time_window[1]}")
-        sim.late_packages += 1
-        site_locs.append((sim.active_packages[p].delivery, 'red'))
-        del sim.active_packages[p]
+    for r in busy_packages_to_del:
+        sim.busy_packages.pop(r, None)
+
+    for r in done_packages_to_del:
+        sim.done_packages.pop(r, None)
+
+    # 3) Handle active packages that expired without attempt
+    packages_to_del = set()
+    for package_nm, rp in list(sim.active_packages.items()):
+        if rp.time_window[1] <= sim.current_time:
+            logging.info(f"{package_nm} was not even attempted!")
+            sim.late_packages += 1
+            packages_to_del.add(package_nm)
+            # Add package location with red
+            curr_sites_locs_cols.append((rp.delivery, "red"))
+
+    for r in packages_to_del:
+        sim.active_packages.pop(r, None)
         sim.num_active_packages -= 1
 
+    # # 4) Generate new packages probabilistically
     # if rng.random() <= sim.new_request_prob:
-    #     name = f"pkg{sim.num_total_packages + 1}"
-    #     pkg = generate_package_request(
-    #         name,
-    #         uniform(loc=sim.city_params.lat_start, scale=sim.city_params.lat_end - sim.city_params.lat_start),
-    #         uniform(loc=sim.city_params.lon_start, scale=sim.city_params.lon_end - sim.city_params.lon_start),
+    #     lat_start, lat_end = sim.city_params.lat_start, sim.city_params.lat_end
+    #     lon_start, lon_end = sim.city_params.lon_start, sim.city_params.lon_end
+    #     new_package = generate_package_request(
+    #         # Sample uniformly in bounds
+    #         rng.uniform(lat_start, lat_end),
+    #         rng.uniform(lon_start, lon_end),
     #         sim.current_time,
     #         sim.time_window_duration,
-    #         rng,
-    #         depot_locs=sim.depot_locs, 
-    #         dist_thresh= sim.distance_thresh,
-    #         csv_logger=csv_logger
+    #         rng
     #     )
-    #     # logging.info(f"New package request generated: {pkg}")
     #     sim.num_total_packages += 1
     #     sim.num_active_packages += 1
-    #     sim.active_packages[name] = pkg
+    #     new_package_nm = f"pkg{sim.num_total_packages}"
+    #     logging.info(f"{new_package_nm} added!")
+    #     sim.active_packages[new_package_nm] = new_package
 
-    for p, rp in sim.active_packages.items():
-        site_locs.append((rp.delivery, 'grey'))
-    for p, rp in sim.busy_packages.items():
-        site_locs.append((rp.delivery, 'grey'))
+    # 5) Grey markers for sites
+    for pkg_nm, pp in sim.active_packages.items():
+        curr_sites_locs_cols.append((pp.delivery, "grey"))
+    for pkg_nm, pp in sim.busy_packages.items():
+        curr_sites_locs_cols.append((pp.delivery, "grey"))
 
-    sim.curr_drone_site_locs = CurrDroneSiteLocs(drone_locs, site_locs)
-    logging.debug(f"[Time Step] Updated drone locations: {len(drone_locs)} drones")
+    sim.curr_drone_site_locs = CurrDroneSiteLocs(curr_drone_locs_cols, curr_sites_locs_cols)
 
 
 
 def update_time_windows(sim, server, csv_logger=None) -> None:
     """
     Recompute interaction events and time windows for all active packages.
-    """
-    assert sim.current_time == server.current_time
-    # print(f"[Time Step] Updating time windows at t={sim.current_time}, server time={server.current_time}")
-    for dn, dp in server.agent_prop_set.items():
-        events = dp.interaction_events # initialize events
-        depot = server.agent_set[dn].depot_loc # latitude and long. of depot
-        for pkg, rp in sim.active_packages.items(): # rp delivery location and time window
-            key = (dn, pkg)
-            if key not in server.agent_task_windows: # server.agent_task_windows is a dict of (dn, pkg) -> (start, finish, return to depot time)
-                # compute the anticipated return time
-                return_time = get_travel_time_estimate(
-                    sim.halton_nn_tree,
-                    rp.delivery,
-                    depot,
-                    sim.estimate_matrix,
-                    sim.time_scale,
-                    csv_logger=csv_logger
-                )
 
-                # this one is from sim.active_packages
-                start, finish = rp.time_window   # earliest time the drone is allowed to depart the depot,  latest time the drone is allowed to finish delivery
-                # now i am copying this package service window for the drone and what would be the latest return to base time
-                ts = (start, finish, math.ceil(finish) + return_time) 
-                server.agent_task_windows[key] = ts
-                
-                # logging.info(f"Creating interaction event for drone {dn} and package {pkg} with timestamps {ts}")
-                ie = InteractionEvent(
-                    agent_name=dn,
-                    task_name=pkg,
-                    timestamps={
-                        MODE.START:   start,
-                        MODE.FINISH:  finish,
-                        MODE.RETURN: math.ceil(finish) + return_time,
-                    },
-                    travel_time=return_time,
-                )
-                events.append(ie)
+    - Ensures sim and server times match.
+    - For each drone and each active package, if that (drone, package) pair
+      doesn't yet have a time-window entry, compute/record:
+        * the drone's return_time estimate (delivery -> depot),
+        * the interaction timestamps {START, FINISH, RETURN},
+        * the server-side agent_task_windows triple [start, finish, return].
+    - Finally, sorts each drone's interaction_events by RETURN time.
+    """
+    assert sim.current_time == server.current_time, "sim and server times must match"
+
+    for drone_nm, drone_props in server.agent_prop_set.items():
+        interaction_events = drone_props.interaction_events
+        drone = server.agent_set[drone_nm]
+        drone_depot = drone.depot_number
+
+
+        # For every active package, initialize per-(drone,package) timing if missing
+        for package_nm, rp in sim.active_packages.items():
+            key = (drone_nm, package_nm)
+            if key not in server.agent_task_windows:
+                 # travel time to return to depot after delivery
+                mean_travel_time = rp.approx_travel_times.get(drone_depot)
+
+                # Build interaction timestamps
+                start_t = rp.time_window[0]
+                finish_t = rp.time_window[1]
+                return2depot_t = math.ceil(finish_t) + mean_travel_time
+
+                ie_timestamps = {
+                    MODE.START:  start_t,
+                    MODE.FINISH: finish_t,
+                    MODE.RETURN: return2depot_t,
+                }
+
+                # Record event + server-side window triple
+                interaction_events.append(InteractionEvent(drone_nm, package_nm, ie_timestamps, mean_travel_time))
+                server.agent_task_windows[key] = [start_t, finish_t, return2depot_t]
                 csv_logger.log("interaction_events.csv", {
                     "timestep": sim.current_time,
-                    "drone": dn,
-                    "package": pkg,
-                    "earliest_time_attempt": start,
-                    "latest_time_attemp": finish,
-                    "success_return": math.ceil(finish) + return_time,
+                    "drone": drone_nm,
+                    "package": package_nm,
+                    "earliest_time_attempt": start_t,
+                    "latest_time_attempt": finish_t,
+                    "success_return": return2depot_t,
                 })
 
         # now sort by the return timestamp
-        events.sort(key=lambda e: e.timestamps[MODE.RETURN])
-        dp.interaction_events = events
-        # logging.info(f"[t={sim.current_time}] Drone {dn} updated interaction events: {len(events)}")
+        interaction_events.sort(key=lambda ev: ev.timestamps[MODE.FINISH])
+        server.agent_prop_set[drone_nm].interaction_events = interaction_events
 
 
 

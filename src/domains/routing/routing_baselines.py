@@ -3,12 +3,12 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Set
 
 # Allocation and simulator types
 from solver.scoba_types import MODE, GenericAllocation as RoutingAllocation
 from .routing_types import RoutingSimulator, EuclideanLatLongMetric, convert_to_vector
-from .routing_simulator import sample_true_delivery_return_time, get_travel_time_estimate
+from .routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes
 from domains.routing.mcts import RoutingMCTSMDP
 import logging
 
@@ -96,112 +96,91 @@ def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, 
     """
     # logging.info("Using EDD baseline for routing allocation.")
 
+    available_drones: Dict[int, List[str]] = {}
 
-    depots: Dict[int, List[str]] = {}
+    
     # group drones by depot
-    for dn, dp in server.agent_prop_set.items():
-        if dp.at_depot:
-            dnum = server.agent_set[dn].depot_number
-            depots.setdefault(dnum, []).append(dn)
-    # logging.info(f"Drones at depot information: {depots}")
+    for drone_nm, dp in server.agent_prop_set.items():
+        drone = server.agent_set[drone_nm]
+        if dp.at_depot is True:
+            if drone.depot_number not in available_drones:
+                available_drones[drone.depot_number] = [drone_nm]
+            else:
+                available_drones[drone.depot_number].append(drone_nm)
 
-    if csv_logger:
-        for depot_num, drones in depots.items():
-            depot_loc = server.agent_set[drones[0]].depot_loc
-            csv_logger.log("depot_drones.csv", {
-                "trial": trial_id,
-                "time": time_step,
-                "depot_id": depot_num,
-                "drone_ids": ";".join(drones),
-                "lat": depot_loc.lat,
-                "lon": depot_loc.lon,
-                "num_drones": len(drones),
-            })
+    all_assigned_pkgs: Set[str] = set()
+    # logging.info(f"Drones at depot information: {depots}")
 
 
     # Finding nearby packages
-    assigned = set()
-    for depot_num, drones in depots.items():
-        depot_loc = server.agent_set[drones[0]].depot_loc
+    for depot_number, depot_drones in available_drones.items():
 
-        in_range = set()
-        for pkg, pp in routing_sim.active_packages.items():
+        # all the drones in this depot share the same depot location
+        depot_loc = server.agent_set[depot_drones[0]].depot_loc
+
+        pkgs_in_range: Set[str] = set()
+        for pkg_nm, pp in routing_sim.active_packages.items():
             dist = EuclideanLatLongMetric().evaluate(
                 convert_to_vector(depot_loc), convert_to_vector(pp.delivery)
             )
-            if dist <= routing_sim.distance_thresh:
-                approx_travel_time = get_travel_time_estimate(
-                    routing_sim.halton_nn_tree,
-                    depot_loc,
-                    pp.delivery,
-                    routing_sim.estimate_matrix,
-                    routing_sim.time_scale
-                )
-                pp.approx_travel_times[depot_num] = approx_travel_time
-                in_range.add(pkg)
-                if csv_logger:
-                    csv_logger.log("depot_package_distances.csv", {
-                        "trial": trial_id,
-                        "time": time_step,
-                        "depot_id": depot_num,
-                        "pkg_id": pkg,
-                        "pkg_lat": pp.delivery.lat,
-                        "pkg_lon": pp.delivery.lon,
-                        "depot_lat": depot_loc.lat,
-                        "depot_lon": depot_loc.lon,
-                        "distance": dist,
-                        "approx_travel_time": approx_travel_time,
-                    })
+            if dist <= routing_sim.distance_thresh:            
+                pkgs_in_range.add(pkg_nm)
+
         # assigning drones to packages
-        for drone_id in drones:
+        for drone_id in depot_drones:
+            ie_idx = None
             #filtering interaction events based on in_range
-            interaction_events = [
-                ie for ie in server.agent_prop_set[drone_id].interaction_events
-                if ie.task_name in in_range and
-                   ie.task_name not in assigned and
-                   ie.task_name not in routing_sim.busy_packages
-            ]
+            server.agent_prop_set[drone_id].interaction_events.sort(key=lambda ev: ev.timestamps[MODE.FINISH])
+            for idx, ie in enumerate(server.agent_prop_set[drone_id].interaction_events):
+                if (
+                    ie.task_name not in all_assigned_pkgs
+                    and ie.task_name in pkgs_in_range
+                    and ie.task_name not in routing_sim.busy_packages
+                ):
+                    ie_idx = idx
+                    break
 
-            # Assign the first valid package
-            for ie in interaction_events:
-                pkg = ie.task_name
-                assigned.add(pkg)
-                server.agent_task_allocation[drone_id] = (pkg, float('inf'))  # inf for now for true delivery, can be updated later
+            if ie_idx is not None:
+                pkg_nm = server.agent_prop_set[drone_id].interaction_events[ie_idx].task_name
+                # Assign the first valid package
+                if pkg_nm not in routing_sim.busy_packages:
+                    all_assigned_pkgs.add(pkg_nm)
 
-                # get the actual delivery time and return time
-                td, rt = sample_true_delivery_return_time(
-                    server.agent_task_windows[(drone_id, pkg)],
-                    server.current_time,
-                    routing_sim.tt_est_std_scale,
-                    rng,
-                )
-                # Update sim state
-                routing_sim.true_delivery_return[(drone_id, pkg)] = (td, rt)
-                server.agent_prop_set[drone_id].at_depot = False
-                server.agent_prop_set[drone_id].current_package = pkg
-                routing_sim.busy_packages[pkg] = routing_sim.active_packages.pop(pkg)
-                routing_sim.num_active_packages -= 1
+                    server.agent_task_allocation[drone_id] = (pkg_nm, float('inf'))  # inf for now for true delivery, can be updated later
+                    # get the actual delivery time and return time
+                    window = routing_sim.active_packages[pkg_nm].time_window
+                    delivery_location = routing_sim.active_packages[pkg_nm].delivery
+                    td, rt = sample_true_delivery_return_time(
+                        depot_loc,
+                        delivery_location,
+                        window,
+                        server.current_time,
+                        rng,
+                    )
+                    # Update sim state
+                    routing_sim.true_delivery_return[(drone_id, pkg_nm)] = (td, rt)
+                    server.agent_prop_set[drone_id].at_depot = False
+                    routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages.pop(pkg_nm)
+                    routing_sim.num_active_packages -= 1
                 
                 
-                if csv_logger:
-                    csv_logger.log("drone_assignment.csv", {
-                        "trial": trial_id,
-                        "time": time_step,
-                        "drone_id": drone_id,
-                        "depot_id": depot_num,
-                        "pkg_id": pkg,
-                        "agent_tw_earliest_time": server.agent_task_windows[(drone_id, pkg)][0],
-                        "agent_tw_latest_time": server.agent_task_windows[(drone_id, pkg)][1],
-                        "agent_tw_avail": server.agent_task_windows[(drone_id, pkg)][2],
-                        "reward": routing_sim.delivery_reward,
-                        "true_return_time": rt,
-                        "true_delivery_time": td,
-                        "approx_travel_time": routing_sim.busy_packages[pkg].approx_travel_times.get(depot_num),
-                        "true_travel_time": rt-td
-                    })
+                    if csv_logger:
+                        csv_logger.log("drone_assignment.csv", {
+                            "trial": trial_id,
+                            "time": time_step,
+                            "drone_id": drone_id,
+                            "depot_number": depot_number,
+                            "pkg_id": pkg_nm,
+                            "pkg_earliest_time": server.agent_task_windows[(drone_id, pkg_nm)][0],
+                            "pkg_latest_time": server.agent_task_windows[(drone_id, pkg_nm)][1],
+                            "true_return_time": rt,
+                            "true_delivery_time": td,
+                            "approx_travel_time": routing_sim.busy_packages[pkg_nm].approx_travel_times.get(depot_number),
+                            "true_travel_time": rt-td
+                        })
 
-                logging.info(f"[Depot {depot_num}] Drone {drone_id} assigned package {pkg}, package delivery time {td}, return time {rt}, package window (start, end, nominal) {server.agent_task_windows[(drone_id, pkg)]}")
-                break  # Only assign one package per drone
+                    logging.info(f"[Depot {depot_number}] Drone {drone_id} assigned package {pkg_nm}, package delivery time {td}, return time {rt}, package window (start, end, nominal) {server.agent_task_windows[(drone_id, pkg_nm)]}")
+                    # break  # Only assign one package per drone
         
 
 
