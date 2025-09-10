@@ -180,14 +180,79 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
     # 3) Resolve conflicts across depots via SCoBA coordination                
     if task_util_allocation:
         scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
-        true_task_util_allocation = scoba_alg.coordinate_allocation(
-            task_util_allocation,
-            all_considered_tasks,
-            assignment_util,
-            success_prob_factory,
-            util_val_fn,
-            0.0,
-        )
+        if comms_dict is None:
+            # scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
+            true_task_util_allocation = scoba_alg.coordinate_allocation(
+                task_util_allocation,
+                all_considered_tasks,
+                assignment_util,
+                success_prob_factory,
+                util_val_fn,
+                0.0,
+            )
+        else:
+            # print("using dec")
+            # --- Build communication neighborhoods between depots ---
+            depots_to_drones: Dict[int, List[str]] = {d: sorted(dr_list) for d, dr_list in available_drones.items()}
+            all_depots: Set[int] = set(depots_to_drones.keys()) | set(comms_dict.keys())
+            depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots}
+
+            # Also guard against depots present in comms_dict with no drones right now
+            for d in comms_dict.keys():
+                depot_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
+            
+            
+            # Map depot -> all drones in its *visible* neighborhood (incl. self depot)
+            visible_drones_by_depot: Dict[int, List[str]] = {}
+            for d in depot_neighbors:
+                vis = []
+                for nd in depot_neighbors[d]:
+                    vis.extend(depots_to_drones.get(nd, []))
+                visible_drones_by_depot[d] = vis
+
+            for d in sorted(visible_drones_by_depot.keys()):
+                group_drones = [dn for dn in visible_drones_by_depot[d]
+                                if dn in task_util_allocation and dn not in server.agent_task_allocation]
+
+                if not group_drones:
+                    continue
+            
+                # Filter the group's proposed tasks to those still active (not already committed by prior groups)
+                # and assemble per-drone considered sets (dict, not a set-of-sets).
+                task_util_in_group: Dict[str, TaskUtil] = {}
+                considered_tasks_in_group: Dict[str, Set[str]] = {}
+                
+                for dn in group_drones:
+                    # proposed task for dn
+                    tu = task_util_allocation.get(dn)
+                    if not tu:
+                        continue
+                    if tu.task not in routing_sim.active_packages:
+                        # proposed package already taken by earlier group ⇒ still include dn but their proposed
+                        # may be invalid; SCoBA will see it as unavailable if not in considered set.
+                        pass
+                    task_util_in_group[dn] = tu
+
+                    # only keep still-active tasks in the "considered" set to prevent SCoBA from picking removed pkgs
+                    considered = {pkg for pkg in all_considered_tasks.get(dn, set())
+                                if pkg in routing_sim.active_packages}
+                    # Edge case: if empty, still include empty set; SCoBA may then skip dn
+                    considered_tasks_in_group[dn] = considered
+
+                if not task_util_in_group:
+                    continue
+
+                assignment_util_in_group = sum(tu.util for tu in task_util_in_group.values())
+
+                # Run SCoBA just for this depot's visible neighborhood
+                true_task_util_allocation = scoba_alg.coordinate_allocation(
+                    task_util_in_group,
+                    considered_tasks_in_group,  # Dict[str, Set[str]]
+                    assignment_util_in_group,
+                    success_prob_factory,
+                    util_val_fn,
+                    0.0,
+                )            
 
         # there might be redundancies in true_task_util_allocation, ignore them.
         for drone_nm, pkg_util in true_task_util_allocation.items():
@@ -240,4 +305,5 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                         "approx_travel_time": routing_sim.busy_packages[pkg_nm].approx_travel_times.get(depot_number),
                         "true_travel_time": rt-td
                         }
-                    )
+                    )   
+        

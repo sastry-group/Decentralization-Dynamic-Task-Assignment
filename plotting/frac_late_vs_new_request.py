@@ -6,8 +6,13 @@ import matplotlib.pyplot as plt
 
 # Configurable params
 probs = [0.5]
-algos = ["scoba", "edd", "ibr"]
-colors = {"scoba": "#1f77b4", "edd": "#ff7f0e", "ibr": "#2ca02c"}  # Optional: custom hex colors
+# algos = ["ibrFull", "ibrTG2","ibrTG3","ibrTG4", "ibrSeq", "ibrUn"]
+algos = ["scobaFull", "scobaTG2","scobaTG3","scobaTG4", "scobaSeq", "scobaUn"]
+# algos = ["ibrFull", "ibr"]
+# colors = {"ibr": "#1f77b4", "ibrFull": "#ff7f0e"}  # Optional: custom hex colors
+# colors = {"ibrTG3": "#1f77b4", "ibrFull": "#ff7f0e", "ibrTG2": "#2ca02c", "ibrTG4": "#d62728", "ibrSeq": "#9467bd", "ibrUn": "#4b828c"}  # Optional: custom hex colors
+colors = {"scobaTG3": "#1f77b4", "scobaFull": "#ff7f0e", "scobaTG2": "#2ca02c", "scobaTG4": "#d62728", "scobaSeq": "#9467bd", "scobaUn": "#4b828c"}  # Optional: custom hex colors
+
 base_dir = "results/logs"
 
 # Initialize result holders
@@ -17,7 +22,7 @@ mean_time = {a: [] for a in algos}
 sem_time = {a: [] for a in algos}
 
 # Extract n_drones and n_depots from sample file
-sample_folder = f"dr10_dep2_probpt{str(probs[0]).replace('.','')}_win15_{algos[0]}"
+sample_folder = f"dr15_dep5_probpt{str(probs[0]).replace('.','')}_win15_{algos[0]}"
 sample_fn = os.path.join(base_dir, sample_folder, f"{sample_folder}.json")
 m = re.search(r"dr(\d+)_dep(\d+)_probpt(\d+)_win(\d+)", sample_folder)
 if m:

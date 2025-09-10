@@ -137,6 +137,13 @@ def plot_initial_map(city_limits, depots, drones, package_dict, radius_km, trial
 
 
 def plot_comms_graph(comms_dict, depots, log_dir=None):
+
+    if not comms_dict:
+        num_depots = len(depots)
+        comms_dict = {i: [j for j in range(1, num_depots + 1) if j != i] for i in range(1, num_depots + 1)}
+
+
+
     fig, ax = plt.subplots(figsize=(12, 10))
     rng = default_rng(42) 
     legend_elements = []

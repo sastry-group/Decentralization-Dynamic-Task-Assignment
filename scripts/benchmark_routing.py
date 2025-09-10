@@ -73,8 +73,8 @@ from solver.scoba_types import SearchTree
 # Constants and file paths
 PARAM_FILES = ROOT / 'param_files'
 TRAVELTIME_EST = ROOT / "param_files" / "scoba_data.npz"
-PARAMS_FN      = str(PARAM_FILES / 'sf_bb_params_2dpts.toml')
-
+# PARAMS_FN      = str(PARAM_FILES / 'sf_bb_params_2dpts.toml')
+PARAMS_FN      = str(PARAM_FILES / 'sf_bb_params.toml')
 
 def parse_commandline():
     p = argparse.ArgumentParser(description='Benchmark routing simulation')
@@ -96,6 +96,7 @@ def parse_commandline():
 
 def main():
     args = parse_commandline()
+    comms_dict = None
     trials = args['trials']
     results = {'trials': trials}
 
@@ -178,16 +179,22 @@ def main():
             )
     num_init = int(round(1.5 * args['n_drones'])) #request number
     
-    #  full - two depots
-    comms_dict = {
-        1: [2],
-        2: [1],
+    # #  full - two depots - test
+    # comms_dict = {
+    #     1: [2],
+    #     2: [1],
 
-    }   
+    # }   
 
+    #  full - three depots - test
+    # comms_dict = {
+    #     1: [2,3],
+    #     2: [1],
+    #     3: [1,2],
 
+    # } 
 
-    # # full
+    # full
     # comms_dict = {
     #     1: [2,3,4,5],
     #     2: [1,3,4,5],
@@ -223,16 +230,25 @@ def main():
     #     4: [1,2,5],
     #     5: [1,2,3,4]
     # }
-        
-    # comms_dict = {
-    #     1: [3,4,5],
-    #     2: [1,3,4,5],
-    #     3: [1,2,4,5],
-    #     4: [1,2,3,5],
-    #     5: [1,2,3,4]
-    # }
 
-    plot_comms_graph(comms_dict, depots, log_dir)
+    # comms_dict = {
+    #     1: [2],
+    #     2: [3],
+    #     3: [4],
+    #     4: [5],
+    #     5: [1]
+    # }
+            
+        
+    comms_dict = {
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: []
+    }
+
+    plot_comms_graph(comms_dict, depots=depots, log_dir=log_dir)
 
 
     # Run trials
@@ -331,7 +347,7 @@ def main():
                 assign = bool(sim.active_packages)
                 if assign:
                     start_time = time.perf_counter()
-                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t, comms_dict=None)
+                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t, comms_dict=comms_dict, allow_overlap=False)
                     end_time = time.perf_counter()
                     elapsed_time = end_time - start_time
                     timing_per_timestep.append(elapsed_time)
