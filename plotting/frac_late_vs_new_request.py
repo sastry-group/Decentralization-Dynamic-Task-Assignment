@@ -6,12 +6,13 @@ import matplotlib.pyplot as plt
 
 # Configurable params
 probs = [0.5]
+algos = ["ibr"]
 # algos = ["ibrFull", "ibrTG2","ibrTG3","ibrTG4", "ibrSeq", "ibrUn"]
-algos = ["scobaFull", "scobaTG2","scobaTG3","scobaTG4", "scobaSeq", "scobaUn"]
+# algos = ["scobaFull", "scobaTG2","scobaTG3","scobaTG4", "scobaSeq", "scobaUn"]
 # algos = ["ibrFull", "ibr"]
-# colors = {"ibr": "#1f77b4", "ibrFull": "#ff7f0e"}  # Optional: custom hex colors
+colors = {"ibr": "#1f77b4", "ibrFull": "#ff7f0e"}  # Optional: custom hex colors
 # colors = {"ibrTG3": "#1f77b4", "ibrFull": "#ff7f0e", "ibrTG2": "#2ca02c", "ibrTG4": "#d62728", "ibrSeq": "#9467bd", "ibrUn": "#4b828c"}  # Optional: custom hex colors
-colors = {"scobaTG3": "#1f77b4", "scobaFull": "#ff7f0e", "scobaTG2": "#2ca02c", "scobaTG4": "#d62728", "scobaSeq": "#9467bd", "scobaUn": "#4b828c"}  # Optional: custom hex colors
+# colors = {"scobaTG3": "#1f77b4", "scobaFull": "#ff7f0e", "scobaTG2": "#2ca02c", "scobaTG4": "#d62728", "scobaSeq": "#9467bd", "scobaUn": "#4b828c"}  # Optional: custom hex colors
 
 base_dir = "results/logs"
 

@@ -98,6 +98,9 @@ class RoutingSimulator:
     busy_packages: Dict[str, Package]   = field(default_factory=dict)
     done_packages: Dict[str, Package]   = field(default_factory=dict)
     in_transit_packages: Dict[str, Package] = field(default_factory=dict)
+    package_claims : Dict[str, str] = field(default_factory=dict) # # Packages currently being attempted by one or more drones (claims)
+    package_winners: Dict[str, str] = field(default_factory=dict) # Packages currently being attempted by one or more drones (winners)
+    package_registry: Dict[str, Any] = field(default_factory=dict) # All packages ever created (for record-keeping) and assignments
     num_total_packages: int             = 0
     num_active_packages: int            = 0
     late_packages: int                  = 0

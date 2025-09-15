@@ -73,8 +73,8 @@ from solver.scoba_types import SearchTree
 # Constants and file paths
 PARAM_FILES = ROOT / 'param_files'
 TRAVELTIME_EST = ROOT / "param_files" / "scoba_data.npz"
-# PARAMS_FN      = str(PARAM_FILES / 'sf_bb_params_2dpts.toml')
-PARAMS_FN      = str(PARAM_FILES / 'sf_bb_params.toml')
+PARAMS_FN_2_DEPOTS      = str(PARAM_FILES / 'sf_bb_params_2dpts.toml')
+PARAMS_FN_5_DEPOTS      = str(PARAM_FILES / 'sf_bb_params.toml')
 
 def parse_commandline():
     p = argparse.ArgumentParser(description='Benchmark routing simulation')
@@ -99,6 +99,10 @@ def main():
     comms_dict = None
     trials = args['trials']
     results = {'trials': trials}
+    if args['n_depots'] == 2:
+        PARAMS_FN = PARAMS_FN_2_DEPOTS
+    elif args['n_depots'] == 5:
+        PARAMS_FN = PARAMS_FN_5_DEPOTS
 
     # rng = default_rng(1345)
     rng = RandomState(1345)
@@ -178,13 +182,21 @@ def main():
                 depot_loc=depot.location,
             )
     num_init = int(round(1.5 * args['n_drones'])) #request number
+    allow_overlap = True
     
-    # #  full - two depots - test
+    #  full - two depots - test
     # comms_dict = {
     #     1: [2],
     #     2: [1],
 
     # }   
+
+    #  NO COMMS full - two depots - test
+    comms_dict = {
+        1: [],
+        2: [],
+
+    }  
 
     #  full - three depots - test
     # comms_dict = {
@@ -240,13 +252,13 @@ def main():
     # }
             
         
-    comms_dict = {
-        1: [],
-        2: [],
-        3: [],
-        4: [],
-        5: []
-    }
+    # comms_dict = {
+    #     1: [],
+    #     2: [],
+    #     3: [],
+    #     4: [],
+    #     5: []
+    # }
 
     plot_comms_graph(comms_dict, depots=depots, log_dir=log_dir)
 
@@ -333,11 +345,11 @@ def main():
                 csv_logger=csv_logger,
                 in_transit_packages=in_transit_pkgs
             )
-            # plot_initial_map(city, 
-            #     depots=depots, drones=server.agent_set,
-            #     package_dict=sim.active_packages,
-            #     radius_km=sim.distance_thresh,
-            #     trial=trial)
+            plot_initial_map(city, 
+                depots=depots, drones=server.agent_set,
+                package_dict=sim.active_packages,
+                radius_km=sim.distance_thresh,
+                trial=trial)
             
             timing_per_timestep = [] 
             for t in range(args['timesteps']):
@@ -347,14 +359,14 @@ def main():
                 assign = bool(sim.active_packages)
                 if assign:
                     start_time = time.perf_counter()
-                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t, comms_dict=comms_dict, allow_overlap=False)
+                    fn(server, sim, rng, csv_logger=csv_logger, trial_id=trial, time_step=t, comms_dict=comms_dict, allow_overlap=allow_overlap)
                     end_time = time.perf_counter()
                     elapsed_time = end_time - start_time
                     timing_per_timestep.append(elapsed_time)
                 else:
                     logging.info(f"No active packages available. Skipping assignment.")
 
-                update_routing_sim(sim, server, rng, csv_logger=csv_logger)
+                update_routing_sim(sim, server, rng, csv_logger=csv_logger, allow_overlap=allow_overlap)
                 
 
 
