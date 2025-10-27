@@ -187,7 +187,7 @@ def setup_routing_sim(server, params_fn: str,
     return sim
 
 
-def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=None,
+def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_logger=None,
                        allow_overlap=False) -> None:
     """
     Advance the routing simulator by one timestep.
@@ -237,7 +237,7 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
                 winner = rng.choice(earliest)  # tie-break
 
             # print(f"Adding winner {winner} for package {pkg} at time {sim.current_time}")
-            sim.package_winners[pkg] = winner
+            sim.package_winners[pkg] = str(winner)
 
             # # Deliver no
 
@@ -283,7 +283,7 @@ def update_routing_sim(sim, server, rng: np.random.Generator = None, csv_logger=
                     sim.active_packages.pop(package_nm, None)
                     if csv_logger:
                         csv_logger.log("final_deliveries.csv", {
-                            "trial": getattr(sim, "trial_id", None),
+                            "trial": trial,
                             "timestep": sim.current_time,
                             "drone_id": winner,
                             "pkg_id": package_nm,

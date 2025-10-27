@@ -69,6 +69,7 @@ def compute_utility(ie: InteractionEvent,
     elif mode == "exact":
         # Requires full visibility of all current assignments
         # current_x = set(assigned.values())
+        assigned[agent] = pkg 
         # welfare_with = welfare_function(current_x.union({pkg}))
         welfare = welfare_function(assigned.values())
         # logging.info(f"Agent {agent}, with base util: {base_util}, welfare_with {welfare_with}, w/o {welfare_without}")
@@ -109,19 +110,13 @@ def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
 
 
 
-def best_response_utility(current_time, ie, reward=1000):
-    start, end, avail = ie.time_window
-    delivery_est = avail  # or an estimate
-    penalty = max(0, delivery_est - end)
-    return reward - penalty
-
-
 
 def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimulator, rng=None, csv_logger=None,
                             init_method = "greedy", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False):
-    max_iters = 50
+
+    # might be redundant but just to separate those at depot without communication constraints
     depots: Dict[int, List[str]] = {}
-    global_depos: Dict[int, List[str]] = {} 
+    global_depos: Dict[int, List[str]] = {} # depots and drones dictionary 
     # group drones by depot
     for dn, dp in server.agent_prop_set.items():
         dnum = server.agent_set[dn].depot_number
@@ -131,22 +126,40 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     # logging.info(f"Drones at depot information: {depots}")
 
 
-    # --- Build communication neighborhoods between depots ---
-    all_depots = set(depots.keys()) 
-    global_depots = set(global_depos.keys())
+    # Depot info considering communication neighborhoods between depots 
+    all_depots_comm_net = set(depots.keys())
+    global_depots_comm_net = set(global_depos.keys()) 
     if comms_dict is None:
         # fully connected: each depot sees all depots (including itself)
-        depot_neighbors = {d: set(all_depots) for d in all_depots}
-        global_depots_neighbors = {d: set(global_depots) for d in global_depots}
+        depot_neighbors = {d: set(all_depots_comm_net) for d in all_depots_comm_net}
+        global_depots_neighbors = {d: set(global_depots_comm_net) for d in global_depots_comm_net}
     else:
-        depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots}
-        global_depots_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in global_depots}
+        depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots_comm_net }
+        global_depots_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in global_depots_comm_net}
         # Also guard against depots present in comms_dict with no drones right now
         for d in comms_dict.keys():
             depot_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
             global_depots_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
     
     
+    visible_by_drone = {}
+    for depot_num, drones in depots.items():
+        vis_drones = []
+        for nd in depot_neighbors.get(depot_num, {depot_num}):
+            vis_drones.extend(depots.get(nd, []))
+        vis_set = set(vis_drones)
+        for dn in drones:
+            visible_by_drone[dn] = sorted(x for x in vis_set if x != dn)
+
+
+    # REMOVE
+    # observers_of = {dn: [] for dn in [x for ds in depots.values() for x in ds]}
+    # for dn, outs in visible_by_drone.items():
+    #     for m in outs:
+    #         observers_of[m].append(dn)
+    # for m in observers_of:
+    #     observers_of[m].sort()
+
     # Map depot -> all drones in its *visible* neighborhood (incl. self depot)
     visible_drones_by_depot: Dict[int, List[str]] = {}
     global_visible_drones_by_depot: Dict[int, List[str]] = {}
@@ -163,14 +176,16 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
             vis.extend(global_depos.get(nd, []))
         global_visible_drones_by_depot[d] = vis
 
+    # if time_step==11:
+    #     print("stop")
     previously_pkgs_visible_to_depot = {d: set() for d in global_depos.keys()}
     
     for depot_num, drones in global_depos.items():
         previous_claim = set()
-        visible_set = set(global_visible_drones_by_depot[depot_num])
+        visible_set = set(global_visible_drones_by_depot[depot_num]) # this contains those from comms neighborhood
         if routing_sim.package_winners:
             for pkg, winner_dn in routing_sim.package_winners.items():
-                if winner_dn in visible_set:
+                if winner_dn in visible_set and pkg not in routing_sim.done_packages:
                     previous_claim.add(pkg)
         
         if routing_sim.package_claims:
@@ -181,12 +196,13 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                 if claimants & visible_set:   # <- intersection non-empty?
                     previous_claim.add(pkg)
         previously_pkgs_visible_to_depot[depot_num] = previous_claim 
+        
 
 
-    # Helper: get visible drones for a given agent
-    def get_visible_drones_for_agent(agent_id: str) -> List[str]:
-        dnum = server.agent_set[agent_id].depot_number
-        return visible_drones_by_depot.get(dnum, [])
+    # # Helper: get visible drones for a given agent - REMOVE
+    # def get_visible_drones_for_agent(agent_id: str) -> List[str]:
+    #     dnum = server.agent_set[agent_id].depot_number
+    #     return visible_drones_by_depot.get(dnum, [])
 
     # --- Precompute interaction events in range per depot ---
     interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
@@ -224,8 +240,9 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     and ie.task_name not in routing_sim.package_claims
                 ]
                 interaction_events_by_drone[dn] = events
+    
 
-    # --- Initial assignment (per depot), same as before ---
+    # --- Initial assignment (per depot)
     assigned: Dict[str, str] = {}
     best_ies: Dict[str, Tuple[str, float]] = {}
     final_assignment: Dict[str, Tuple[str, float, InteractionEvent]] = {}
@@ -233,7 +250,10 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     for depot_num, drones in depots.items():
         assigned_per_depot = []
         
-
+        if init_method == "empty":
+            # No pre-assignments; best-response will fill in during k-rounds
+            for dn in drones:
+                best_ies[dn] = (None, 0.0)
         if init_method == "random":
             for dn in drones:
                 events = interaction_events_by_drone.get(dn, [])
@@ -268,56 +288,53 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
       
     # --- Iterative best response (GLOBAL), information-aware ---
     # Important: each drone "sees" only drones from depots in its comms neighborhood.
-    iter_count = 0
-    updated = True
+    k_rounds = 100
     all_considered_drones = [dn for drones in depots.values() for dn in drones]
 
-    while updated and iter_count < max_iters:
-        updated = False
+    rounds_completed = 0
+    steps_total = 0
+    changes_total = 0
 
-        for dn in all_considered_drones:
-            # Only drones at depot can re-choose
-            if not server.agent_prop_set[dn].at_depot:
+    for r in range(1, k_rounds + 1):
+        changes_this_round = 0
+        # Only drones at depot can re-choose
+        for drone in all_considered_drones:
+            if not server.agent_prop_set[drone].at_depot:
                 continue
 
-            # Visible neighbors (exclude self)
-            # visible_drones = [other for other in get_visible_drones_for_agent(dn) if other != dn]
-            visible_drones = [other for other in get_visible_drones_for_agent(dn)]
+            steps_total += 1
+       
+            # visible_drones = [other for other in get_visible_drones_for_agent(drone)]
+            visible_drones = visible_by_drone.get(drone, [])
+            if not visible_drones:
+                continue
 
-
-            # Packages already taken by visible neighbors
-            drone_depot = server.agent_set[dn].depot_number
-            visible_assigned_pkgs = {assigned[n] for n in visible_drones if assigned.get(n) is not None}
-            visible_assigned_pkgs = visible_assigned_pkgs | previously_pkgs_visible_to_depot[drone_depot]
-            # visible_assigned_pkgs = ourtingsim.package_winners.values() | visible_assigned_pkgs
-
-            # Build a filtered "assigned" dict that only includes visible assignments
             assigned_visible = {n: p for n, p in assigned.items() if n in visible_drones and p is not None}
+            visible_assigned_pkgs = set(assigned_visible.values())
 
-            # Evaluate best response over candidate events
+            # include previously visible packages for this drone's depot
+            dnum = server.agent_set[drone].depot_number         
+            visible_assigned_pkgs |= previously_pkgs_visible_to_depot.get(dnum, set())
+
+
             best_ie = None
             best_util = float("-inf")
-          
 
-            for ie in interaction_events_by_drone.get(dn, []):
+            for ie in interaction_events_by_drone.get(drone, []):
                 pkg = ie.task_name
 
-                # Respect resource exclusivity as perceived via comms + global busy
-                if allow_overlap is False:
+                # Exclusivity as perceived by 'drone'
+                if not allow_overlap:
                     if pkg in visible_assigned_pkgs or pkg in routing_sim.busy_packages:
                         continue
                 else:
                     if pkg in visible_assigned_pkgs:
                         continue
-                # Optional: also avoid duplicating globally to be safe in a racey environment
-                # if pkg in assigned.values() and assigned.get(dn) != pkg:
-                #     continue
 
-                # Compute utility using only *visible* conflicts, i.e., Ui(x_i, x_Ni)
                 u = compute_utility(
                     ie=ie,
-                    agent=dn,
-                    assigned=assigned_visible,   
+                    agent=drone,
+                    assigned=assigned_visible,
                     server=server,
                     routing_sim=routing_sim,
                     mode="exact",
@@ -325,17 +342,29 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     delivery_reward=routing_sim.delivery_reward
                 )
 
-                if u > best_util:
-                    best_util = u
-                    best_ie = ie
+                # deterministic tie-break to keep runs reproducible
+                if (u > best_util) or (u == best_util and (best_ie is None or ie.task_name < best_ie.task_name)):
+                    best_util, best_ie = u, ie
 
-            # Apply best response if it changes the chosen task
-            if best_ie and assigned.get(dn) != best_ie.task_name:
-                assigned[dn] = best_ie.task_name
-                final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
-                updated = True
+            # Commit immediately if the best response changes the action
+            if best_ie and assigned.get(drone) != best_ie.task_name:
+                assigned[drone] = best_ie.task_name
+                final_assignment[drone] = (best_ie.task_name, best_util, best_ie)
+                changes_this_round += 1
+                changes_total += 1
 
-        iter_count += 1
+        if changes_this_round == 0:
+            break  # early convergence after a FULL round with zero changes
+        rounds_completed += 1
+
+    csv_logger.log("computational_efficiency_metrics.csv", {
+                            "trial": trial_id,
+                            "time": time_step,
+                            "iterations": steps_total,
+                            "k_rounds": rounds_completed,
+                            "changes": changes_total
+
+                        })
 
     for dn, pkg in assigned.items():
         

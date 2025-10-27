@@ -104,206 +104,482 @@ def make_success_prob_fn(sim, server, drone_nm):
     return success_prob
 
 
-def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_id=None, time_step=None, comms_dict=None) -> None:
+def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_id=None, time_step=None, 
+                  comms_dict=None, allow_overlap=False) -> None:
     """
     Assign tasks to drones using the SC0BA conflict-based allocation algorithm.
     `server` is a RoutingAllocation, `routing_sim` a RoutingSimulator.
     """
-    # 1) Group available drones by depot
-    # logging.info(f"[t={server.current_time}] Starting SCoBA assignment...")
-    available_drones = {}  # depot_number -> [drone_names]
-    for drone_nm, dp in server.agent_prop_set.items():
-        drone = server.agent_set[drone_nm]
-        if dp.at_depot is True:
-            available_drones.setdefault(drone.depot_number, []).append(drone_nm)
+    if not allow_overlap: 
+        # 1) Group available drones by depot
+        # logging.info(f"[t={server.current_time}] Starting SCoBA assignment...")
+        available_drones = {}  # depot_number -> [drone_names]
+        for drone_nm, dp in server.agent_prop_set.items():
+            drone = server.agent_set[drone_nm]
+            if dp.at_depot is True:
+                available_drones.setdefault(drone.depot_number, []).append(drone_nm)
 
-    # Diagnostics to send to CBA
-    task_util_allocation = {}       # drone_nm -> TaskUtil(task=<pkg_nm>, util=<value>)
-    all_considered_tasks = {}       # drone_nm -> set(pkg_nms)
-    assignment_util = 0.0
-
-
-    def util_val_fn(ie):
-        return routing_sim.delivery_reward
-    
-    # a factory the coordinator can call: given drone -> returns (ref_time, ie) -> prob
-    def success_prob_factory(drone_nm: str):
-        return make_success_prob_fn(routing_sim, server, drone_nm)
-
-    # 2) Assign all available drones, grouped by depot
-    for depot_number, depot_drones in available_drones.items():
-        # Any drone from this depot has the same depot_loc
-        depot_loc = server.agent_set[depot_drones[0]].depot_loc
+        # Diagnostics to send to CBA
+        task_util_allocation = {}       # drone_nm -> TaskUtil(task=<pkg_nm>, util=<value>)
+        all_considered_tasks = {}       # drone_nm -> set(pkg_nms)
+        assignment_util = 0.0
 
 
-        # Find packages in range of this depot
-        pkgs_in_range = set()
-        for pkg_nm, pp in routing_sim.active_packages.items():
-            dist = EuclideanLatLongMetric().evaluate(
-                convert_to_vector(depot_loc), convert_to_vector(pp.delivery)
-            )
-            if dist <= routing_sim.distance_thresh:
-                pkgs_in_range.add(pkg_nm)
-
-
-        depot_assigned_pkgs = set()
-        # Priority ordering among drones from the same depot
-        for drone_nm in depot_drones:
-            # Exclude already tentatively assigned packages (from this depot)
-            pkgs_to_consider = pkgs_in_range - depot_assigned_pkgs
+        def util_val_fn(ie):
+            return routing_sim.delivery_reward
         
-            sp_fn = success_prob_factory(drone_nm)
-            # Generate the single-agent search tree
-            # Build the single-agent tree
-            generate_search_tree(
-                server,
-                drone_nm,
-                pkgs_to_consider,
-                sp_fn,              # <-- success prob callable: (ref_time, ie) -> [0,1]
-                util_val_fn,
-                server.current_time 
-            )
-            tree = server.agent_prop_set[drone_nm].tree
+        # a factory the coordinator can call: given drone -> returns (ref_time, ie) -> prob
+        def success_prob_factory(drone_nm: str):
+            return make_success_prob_fn(routing_sim, server, drone_nm)
 
-            if tree:  # not empty
-                dec_idx = get_next_attempt_idx(tree)
-                if dec_idx != -1:
-                    dec_node = tree.nodes[dec_idx]
-                    # Tentatively mark this package as taken by a drone from this depot
-                    depot_assigned_pkgs.add(dec_node.task_name)
 
-                    # Record diagnostics for coordination step
-                    assignment_util += dec_node.util
-                    task_util_allocation[drone_nm] = TaskUtil(task=dec_node.task_name, util=dec_node.util)
-                    all_considered_tasks[drone_nm] = set(pkgs_to_consider)
 
-    # 3) Resolve conflicts across depots via SCoBA coordination                
-    if task_util_allocation:
-        scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
-        if comms_dict is None:
-            # scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
-            true_task_util_allocation = scoba_alg.coordinate_allocation(
-                task_util_allocation,
-                all_considered_tasks,
-                assignment_util,
-                success_prob_factory,
-                util_val_fn,
-                0.0,
-            )
-        else:
-            # print("using dec")
-            # --- Build communication neighborhoods between depots ---
-            depots_to_drones: Dict[int, List[str]] = {d: sorted(dr_list) for d, dr_list in available_drones.items()}
-            all_depots: Set[int] = set(depots_to_drones.keys()) | set(comms_dict.keys())
-            depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots}
+        # 2) Assign all available drones, grouped by depot
+        for depot_number, depot_drones in available_drones.items():
+            # Any drone from this depot has the same depot_loc
+            depot_loc = server.agent_set[depot_drones[0]].depot_loc
 
-            # Also guard against depots present in comms_dict with no drones right now
-            for d in comms_dict.keys():
-                depot_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
+
+            # Find packages in range of this depot
+            pkgs_in_range = set()
+            for pkg_nm, pp in routing_sim.active_packages.items():
+                dist = EuclideanLatLongMetric().evaluate(
+                    convert_to_vector(depot_loc), convert_to_vector(pp.delivery)
+                )
+                if dist <= routing_sim.distance_thresh:
+                    pkgs_in_range.add(pkg_nm)
+
+
+            depot_assigned_pkgs = set()
+            # Priority ordering among drones from the same depot
+            for drone_nm in depot_drones:
+                # Exclude already tentatively assigned packages (from this depot)
+                pkgs_to_consider = pkgs_in_range - depot_assigned_pkgs
             
-            
-            # Map depot -> all drones in its *visible* neighborhood (incl. self depot)
-            visible_drones_by_depot: Dict[int, List[str]] = {}
-            for d in depot_neighbors:
-                vis = []
-                for nd in depot_neighbors[d]:
-                    vis.extend(depots_to_drones.get(nd, []))
-                visible_drones_by_depot[d] = vis
+                sp_fn = success_prob_factory(drone_nm)
+                # Generate the single-agent search tree
+                # Build the single-agent tree
+                generate_search_tree(
+                    server,
+                    drone_nm,
+                    pkgs_to_consider,
+                    sp_fn,              # <-- success prob callable: (ref_time, ie) -> [0,1]
+                    util_val_fn,
+                    server.current_time 
+                )
+                tree = server.agent_prop_set[drone_nm].tree
 
-            for d in sorted(visible_drones_by_depot.keys()):
-                group_drones = [dn for dn in visible_drones_by_depot[d]
-                                if dn in task_util_allocation and dn not in server.agent_task_allocation]
+                if tree:  # not empty
+                    dec_idx = get_next_attempt_idx(tree)
+                    if dec_idx != -1:
+                        dec_node = tree.nodes[dec_idx]
+                        # Tentatively mark this package as taken by a drone from this depot
+                        depot_assigned_pkgs.add(dec_node.task_name)
 
-                if not group_drones:
-                    continue
-            
-                # Filter the group's proposed tasks to those still active (not already committed by prior groups)
-                # and assemble per-drone considered sets (dict, not a set-of-sets).
-                task_util_in_group: Dict[str, TaskUtil] = {}
-                considered_tasks_in_group: Dict[str, Set[str]] = {}
-                
-                for dn in group_drones:
-                    # proposed task for dn
-                    tu = task_util_allocation.get(dn)
-                    if not tu:
-                        continue
-                    if tu.task not in routing_sim.active_packages:
-                        # proposed package already taken by earlier group ⇒ still include dn but their proposed
-                        # may be invalid; SCoBA will see it as unavailable if not in considered set.
-                        pass
-                    task_util_in_group[dn] = tu
+                        # Record diagnostics for coordination step
+                        assignment_util += dec_node.util
+                        task_util_allocation[drone_nm] = TaskUtil(task=dec_node.task_name, util=dec_node.util)
+                        all_considered_tasks[drone_nm] = set(pkgs_to_consider)
 
-                    # only keep still-active tasks in the "considered" set to prevent SCoBA from picking removed pkgs
-                    considered = {pkg for pkg in all_considered_tasks.get(dn, set())
-                                if pkg in routing_sim.active_packages}
-                    # Edge case: if empty, still include empty set; SCoBA may then skip dn
-                    considered_tasks_in_group[dn] = considered
-
-                if not task_util_in_group:
-                    continue
-
-                assignment_util_in_group = sum(tu.util for tu in task_util_in_group.values())
-
-                # Run SCoBA just for this depot's visible neighborhood
+        # 3) Resolve conflicts across depots via SCoBA coordination    
+        # 
+           
+        if task_util_allocation:
+            scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
+            if comms_dict is None:
+                # scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
                 true_task_util_allocation = scoba_alg.coordinate_allocation(
-                    task_util_in_group,
-                    considered_tasks_in_group,  # Dict[str, Set[str]]
-                    assignment_util_in_group,
+                    task_util_allocation,
+                    all_considered_tasks,
+                    assignment_util,
                     success_prob_factory,
                     util_val_fn,
                     0.0,
-                )            
+                )
+            else:
+                # print("using dec")
+                # --- Build communication neighborhoods between depots ---
+                depots_to_drones: Dict[int, List[str]] = {d: sorted(dr_list) for d, dr_list in available_drones.items()}
+                all_depots: Set[int] = set(depots_to_drones.keys()) | set(comms_dict.keys())
+                depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots}
 
-        # there might be redundancies in true_task_util_allocation, ignore them.
-        for drone_nm, pkg_util in true_task_util_allocation.items():
-            # Defensive access whether it's a namedtuple/object/dict
-            pkg_nm = pkg_util.task
-            depot_loc = server.agent_set[drone_nm].depot_loc
-            # Ensure drone isn't already assigned
-            assert drone_nm not in server.agent_task_allocation
+                # Also guard against depots present in comms_dict with no drones right now
+                for d in comms_dict.keys():
+                    depot_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
+                
+                
+                # Map depot -> all drones in its *visible* neighborhood (incl. self depot)
+                visible_drones_by_depot: Dict[int, List[str]] = {}
+                for d in depot_neighbors:
+                    vis = []
+                    for nd in depot_neighbors[d]:
+                        vis.extend(depots_to_drones.get(nd, []))
+                    visible_drones_by_depot[d] = vis
 
-            if pkg_nm not in routing_sim.busy_packages:
-                # Assign (drone -> package) with time = Inf (unknown attempt time placeholder)
-                server.agent_task_allocation[drone_nm] =  (pkg_nm, float("inf"))
+                for d in sorted(visible_drones_by_depot.keys()):
+                    group_drones = [dn for dn in visible_drones_by_depot[d]
+                                    if dn in task_util_allocation and dn not in server.agent_task_allocation]
+
+                    if not group_drones:
+                        continue
+                
+                    # Filter the group's proposed tasks to those still active (not already committed by prior groups)
+                    # and assemble per-drone considered sets (dict, not a set-of-sets).
+                    task_util_in_group: Dict[str, TaskUtil] = {}
+                    considered_tasks_in_group: Dict[str, Set[str]] = {}
+                    
+                    for dn in group_drones:
+                        # proposed task for dn
+                        tu = task_util_allocation.get(dn)
+                        if not tu:
+                            continue
+                        if tu.task not in routing_sim.active_packages:
+                            # proposed package already taken by earlier group ⇒ still include dn but their proposed
+                            # may be invalid; SCoBA will see it as unavailable if not in considered set.
+                            pass
+                        task_util_in_group[dn] = tu
+
+                        # only keep still-active tasks in the "considered" set to prevent SCoBA from picking removed pkgs
+                        considered = {pkg for pkg in all_considered_tasks.get(dn, set())
+                                    if pkg in routing_sim.active_packages}
+                        # Edge case: if empty, still include empty set; SCoBA may then skip dn
+                        considered_tasks_in_group[dn] = considered
+
+                    if not task_util_in_group:
+                        continue
+
+                    assignment_util_in_group = sum(tu.util for tu in task_util_in_group.values())
+
+                    # Run SCoBA just for this depot's visible neighborhood
+                    true_task_util_allocation = scoba_alg.coordinate_allocation(
+                        task_util_in_group,
+                        considered_tasks_in_group,  # Dict[str, Set[str]]
+                        assignment_util_in_group,
+                        success_prob_factory,
+                        util_val_fn,
+                        0.0,
+                    )            
+
+            # there might be redundancies in true_task_util_allocation, ignore them.
+            for drone_nm, pkg_util in true_task_util_allocation.items():
+                # Defensive access whether it's a namedtuple/object/dict
+                pkg_nm = pkg_util.task
+                depot_loc = server.agent_set[drone_nm].depot_loc
+                # Ensure drone isn't already assigned
+                assert drone_nm not in server.agent_task_allocation
+
+                if pkg_nm not in routing_sim.busy_packages:
+                    # Assign (drone -> package) with time = Inf (unknown attempt time placeholder)
+                    server.agent_task_allocation[drone_nm] =  (pkg_nm, float("inf"))
 
 
-                window = routing_sim.active_packages[pkg_nm].time_window
-                delivery_location = routing_sim.active_packages[pkg_nm].delivery
-                td, rt = sample_true_delivery_return_time(
-                        depot_loc,
-                        delivery_location,
-                        window,
-                        server.current_time,
-                        rng,
-                    )
-                routing_sim.true_delivery_return[(drone_nm, pkg_nm)] = (td, rt)
+                    window = routing_sim.active_packages[pkg_nm].time_window
+                    delivery_location = routing_sim.active_packages[pkg_nm].delivery
+                    td, rt = sample_true_delivery_return_time(
+                            depot_loc,
+                            delivery_location,
+                            window,
+                            server.current_time,
+                            rng,
+                        )
+                    routing_sim.true_delivery_return[(drone_nm, pkg_nm)] = (td, rt)
 
-                # Update drone state
-                server.agent_prop_set[drone_nm].at_depot = False
-                server.agent_prop_set[drone_nm].current_package = pkg_nm
+                    # Update drone state
+                    server.agent_prop_set[drone_nm].at_depot = False
+                    server.agent_prop_set[drone_nm].current_package = pkg_nm
 
-                # Move package from active -> busy
-                new_busy_package = routing_sim.active_packages[pkg_nm]
-                routing_sim.busy_packages[pkg_nm] = new_busy_package
-                routing_sim.active_packages.pop(pkg_nm, None)
-                routing_sim.num_active_packages -= 1
-                depot_number = server.agent_set[drone_nm].depot_number
+                    # Move package from active -> busy
+                    new_busy_package = routing_sim.active_packages[pkg_nm]
+                    routing_sim.busy_packages[pkg_nm] = new_busy_package
+                    routing_sim.active_packages.pop(pkg_nm, None)
+                    routing_sim.num_active_packages -= 1
+                    depot_number = server.agent_set[drone_nm].depot_number
 
-                if csv_logger:
-                    csv_logger.log("drone_assignment.csv",
-                    {
-                        "trial": trial_id,
-                        "time": time_step,
-                        "drone_id": drone_nm,
-                        "depot_number": depot_number,
-                        "pkg_id": pkg_nm,
-                        "pkg_earliest_time": server.agent_task_windows[(drone_nm, pkg_nm)][0],
-                        "pkg_latest_time": server.agent_task_windows[(drone_nm, pkg_nm)][1],
-                        "agent_tw_avail": server.agent_task_windows[(drone_nm, pkg_nm)][2],
-                        "true_return_time": rt,
-                        "true_delivery_time": td,
-                        "approx_travel_time": routing_sim.busy_packages[pkg_nm].approx_travel_times.get(depot_number),
-                        "true_travel_time": rt-td
-                        }
-                    )   
+                    if csv_logger:
+                        csv_logger.log("drone_assignment.csv",
+                        {
+                            "trial": trial_id,
+                            "time": time_step,
+                            "drone_id": drone_nm,
+                            "depot_number": depot_number,
+                            "pkg_id": pkg_nm,
+                            "pkg_earliest_time": server.agent_task_windows[(drone_nm, pkg_nm)][0],
+                            "pkg_latest_time": server.agent_task_windows[(drone_nm, pkg_nm)][1],
+                            "agent_tw_avail": server.agent_task_windows[(drone_nm, pkg_nm)][2],
+                            "true_return_time": rt,
+                            "true_delivery_time": td,
+                            "approx_travel_time": routing_sim.busy_packages[pkg_nm].approx_travel_times.get(depot_number),
+                            "true_travel_time": rt-td
+                            }
+                        )   
+
+    else:
+        # 1) Group available drones by depot
+        # logging.info(f"[t={server.current_time}] Starting SCoBA assignment...")
+        available_drones = {}  # depot_number -> [drone_names]
+        global_depos: Dict[int, List[str]] = {} 
+        for drone_nm, dp in server.agent_prop_set.items():
+            drone = server.agent_set[drone_nm]
+            if dp.at_depot is True:
+                available_drones.setdefault(drone.depot_number, []).append(drone_nm)
+            global_depos.setdefault(drone.depot_number, []).append(drone_nm)
+
+        # Diagnostics to send to CBA
+        task_util_allocation = {}       # drone_nm -> TaskUtil(task=<pkg_nm>, util=<value>)
+        all_considered_tasks = {}       # drone_nm -> set(pkg_nms)
+        assignment_util = 0.0
+
+        all_depots = set(available_drones.keys()) 
+        global_depots = set(global_depos.keys())
+        if comms_dict is None:
+            # fully connected: each depot sees all depots (including itself)
+            depot_neighbors = {d: set(all_depots) for d in all_depots}
+            global_depots_neighbors = {d: set(global_depots) for d in global_depots}
+        else:
+            depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots}
+            global_depots_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in global_depots}
+            # Also guard against depots present in comms_dict with no drones right now
+            for d in comms_dict.keys():
+                depot_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
+                global_depots_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
+    # Map depot -> all drones in its *visible* neighborhood (incl. self depot)
+    visible_drones_by_depot: Dict[int, List[str]] = {}
+    global_visible_drones_by_depot: Dict[int, List[str]] = {}
+
+    for d in depot_neighbors:
+        vis = []
+        for nd in depot_neighbors[d]:
+            vis.extend(available_drones.get(nd, []))
+        visible_drones_by_depot[d] = vis
+
+    for d in global_depots_neighbors:
+        vis = []
+        for nd in global_depots_neighbors[d]:
+            vis.extend(global_depos.get(nd, []))
+        global_visible_drones_by_depot[d] = vis
+
+    previously_pkgs_visible_to_depot = {d: set() for d in global_depos.keys()}
+    
+    for depot_num, drones in global_depos.items():
+        previous_claim = set()
+        visible_set = set(global_visible_drones_by_depot[depot_num])
+        if routing_sim.package_winners:
+            for pkg, winner_dn in routing_sim.package_winners.items():
+                if winner_dn in visible_set:
+                    previous_claim.add(pkg)
         
+        if routing_sim.package_claims:
+            for pkg, claimants in routing_sim.package_claims.items():
+                # claimants might be set or list; normalize to set
+                if not isinstance(claimants, set):
+                    claimants = set(claimants)
+                if claimants & visible_set:   # <- intersection non-empty?
+                    previous_claim.add(pkg)
+        previously_pkgs_visible_to_depot[depot_num] = previous_claim 
+
+        # Helper: get visible drones for a given agent
+        def get_visible_drones_for_agent(agent_id: str) -> List[str]:
+            dnum = server.agent_set[agent_id].depot_number
+            return visible_drones_by_depot.get(dnum, [])
+
+        # --- Precompute interaction events in range per depot ---
+        interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
+        in_range_by_depot: Dict[int, set] = {}
+
+
+        def util_val_fn(ie):
+            return routing_sim.delivery_reward
+        
+        # a factory the coordinator can call: given drone -> returns (ref_time, ie) -> prob
+        def success_prob_factory(drone_nm: str):
+            return make_success_prob_fn(routing_sim, server, drone_nm)
+
+
+        # --- Precompute interaction events in range per depot ---
+        interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
+        in_range_by_depot: Dict[int, set] = {}
+
+        # 2) Assign all available drones, grouped by depot
+        for depot_number, depot_drones in available_drones.items():
+            # Any drone from this depot has the same depot_loc
+            depot_loc = server.agent_set[depot_drones[0]].depot_loc
+
+
+            # Find packages in range of this depot
+            pkgs_in_range = set()
+            for pkg_nm, pp in routing_sim.active_packages.items():
+                dist = EuclideanLatLongMetric().evaluate(
+                    convert_to_vector(depot_loc), convert_to_vector(pp.delivery)
+                )
+                if dist <= routing_sim.distance_thresh:
+                    pkgs_in_range.add(pkg_nm)
+            in_range_by_depot[depot_number] = pkgs_in_range
+
+
+            depot_assigned_pkgs = set()
+            # Priority ordering among drones from the same depot
+            for drone_nm in depot_drones:
+                # Exclude already tentatively assigned packages (from this depot)
+                pkgs_to_consider = in_range_by_depot[depot_number] - depot_assigned_pkgs - previously_pkgs_visible_to_depot[depot_number]
+            
+                sp_fn = success_prob_factory(drone_nm)
+                # Generate the single-agent search tree
+                # Build the single-agent tree
+                generate_search_tree(
+                    server,
+                    drone_nm,
+                    pkgs_to_consider,
+                    sp_fn,              # <-- success prob callable: (ref_time, ie) -> [0,1]
+                    util_val_fn,
+                    server.current_time 
+                )
+                tree = server.agent_prop_set[drone_nm].tree
+
+                if tree:  # not empty
+                    dec_idx = get_next_attempt_idx(tree)
+                    if dec_idx != -1:
+                        dec_node = tree.nodes[dec_idx]
+                        # Tentatively mark this package as taken by a drone from this depot
+                        depot_assigned_pkgs.add(dec_node.task_name)
+
+                        # Record diagnostics for coordination step
+                        assignment_util += dec_node.util
+                        task_util_allocation[drone_nm] = TaskUtil(task=dec_node.task_name, util=dec_node.util)
+                        all_considered_tasks[drone_nm] = set(pkgs_to_consider)
+
+        # 3) Resolve conflicts across depots via SCoBA coordination    
+        # 
+           
+        if task_util_allocation:
+            scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
+            if comms_dict is None:
+                # scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
+                true_task_util_allocation = scoba_alg.coordinate_allocation(
+                    task_util_allocation,
+                    all_considered_tasks,
+                    assignment_util,
+                    success_prob_factory,
+                    util_val_fn,
+                    0.0,
+                )
+            else:
+                # print("using dec")
+                # --- Build communication neighborhoods between depots ---
+                depots_to_drones: Dict[int, List[str]] = {d: sorted(dr_list) for d, dr_list in available_drones.items()}
+                all_depots: Set[int] = set(depots_to_drones.keys()) | set(comms_dict.keys())
+                depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots}
+
+                # Also guard against depots present in comms_dict with no drones right now
+                for d in comms_dict.keys():
+                    depot_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
+                
+                
+                # Map depot -> all drones in its *visible* neighborhood (incl. self depot)
+                visible_drones_by_depot: Dict[int, List[str]] = {}
+                for d in depot_neighbors:
+                    vis = []
+                    for nd in depot_neighbors[d]:
+                        vis.extend(depots_to_drones.get(nd, []))
+                    visible_drones_by_depot[d] = vis
+
+                for d in sorted(visible_drones_by_depot.keys()):
+                    group_drones = [dn for dn in visible_drones_by_depot[d]
+                                    if dn in task_util_allocation and dn not in server.agent_task_allocation]
+
+                    if not group_drones:
+                        continue
+                
+                    # Filter the group's proposed tasks to those still active (not already committed by prior groups)
+                    # and assemble per-drone considered sets (dict, not a set-of-sets).
+                    task_util_in_group: Dict[str, TaskUtil] = {}
+                    considered_tasks_in_group: Dict[str, Set[str]] = {}
+                    
+                    for dn in group_drones:
+                        # proposed task for dn
+                        tu = task_util_allocation.get(dn)
+                        if not tu:
+                            continue
+                        if tu.task not in routing_sim.active_packages:
+                            # proposed package already taken by earlier group ⇒ still include dn but their proposed
+                            # may be invalid; SCoBA will see it as unavailable if not in considered set.
+                            pass
+                        task_util_in_group[dn] = tu
+
+                        # only keep still-active tasks in the "considered" set to prevent SCoBA from picking removed pkgs
+                        considered = {pkg for pkg in all_considered_tasks.get(dn, set())
+                                    if pkg in routing_sim.active_packages}
+                        # Edge case: if empty, still include empty set; SCoBA may then skip dn
+                        considered_tasks_in_group[dn] = considered
+
+                    if not task_util_in_group:
+                        continue
+
+                    assignment_util_in_group = sum(tu.util for tu in task_util_in_group.values())
+
+                    # Run SCoBA just for this depot's visible neighborhood
+                    true_task_util_allocation = scoba_alg.coordinate_allocation(
+                        task_util_in_group,
+                        considered_tasks_in_group,  # Dict[str, Set[str]]
+                        assignment_util_in_group,
+                        success_prob_factory,
+                        util_val_fn,
+                        0.0,
+                    )            
+
+            # there might be redundancies in true_task_util_allocation, ignore them.
+            for drone_nm, pkg_util in true_task_util_allocation.items():
+                # Defensive access whether it's a namedtuple/object/dict
+                pkg_nm = pkg_util.task
+                depot_loc = server.agent_set[drone_nm].depot_loc
+                # Ensure drone isn't already assigned
+                assert drone_nm not in server.agent_task_allocation
+
+                if pkg_nm not in previously_pkgs_visible_to_depot[server.agent_set[drone_nm].depot_number]:
+                    # Assign (drone -> package) with time = Inf (unknown attempt time placeholder)
+                    server.agent_task_allocation[drone_nm] =  (pkg_nm, float("inf"))
+
+
+                    window = routing_sim.active_packages[pkg_nm].time_window
+                    delivery_location = routing_sim.active_packages[pkg_nm].delivery
+                    td, rt = sample_true_delivery_return_time(
+                            depot_loc,
+                            delivery_location,
+                            window,
+                            server.current_time,
+                            rng,
+                        )
+                    routing_sim.true_delivery_return[(drone_nm, pkg_nm)] = (td, rt)
+
+                    # Update drone state
+                    server.agent_prop_set[drone_nm].at_depot = False
+                    server.agent_prop_set[drone_nm].current_package = pkg_nm
+
+                    # Move package from active -> busy
+                    routing_sim.package_claims.setdefault(pkg, set()).add(dn)
+                    routing_sim.package_registry[pkg]["claimed_by"].append(dn)
+                    routing_sim.package_registry[pkg]["time_assigned"].append(time_step)
+                    routing_sim.busy_packages[pkg] = routing_sim.active_packages.get(pkg)
+                    # new_busy_package = routing_sim.active_packages[pkg_nm]
+                    # routing_sim.busy_packages[pkg_nm] = new_busy_package
+                    # routing_sim.active_packages.pop(pkg_nm, None)
+                    # routing_sim.num_active_packages -= 1
+                    depot_number = server.agent_set[drone_nm].depot_number
+
+                    if csv_logger:
+                        csv_logger.log("drone_assignment.csv",
+                        {
+                            "trial": trial_id,
+                            "time": time_step,
+                            "drone_id": drone_nm,
+                            "depot_number": depot_number,
+                            "pkg_id": pkg_nm,
+                            "pkg_earliest_time": server.agent_task_windows[(drone_nm, pkg_nm)][0],
+                            "pkg_latest_time": server.agent_task_windows[(drone_nm, pkg_nm)][1],
+                            "agent_tw_avail": server.agent_task_windows[(drone_nm, pkg_nm)][2],
+                            "true_return_time": rt,
+                            "true_delivery_time": td,
+                            "approx_travel_time": routing_sim.busy_packages[pkg_nm].approx_travel_times.get(depot_number),
+                            "true_travel_time": rt-td
+                            }
+                        )   
+            

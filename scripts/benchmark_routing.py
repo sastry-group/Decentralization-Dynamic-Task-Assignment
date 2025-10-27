@@ -192,11 +192,11 @@ def main():
     # }   
 
     #  NO COMMS full - two depots - test
-    comms_dict = {
-        1: [],
-        2: [],
+    # comms_dict = {
+    #     1: [],
+    #     2: [],
 
-    }  
+    # }  
 
     #  full - three depots - test
     # comms_dict = {
@@ -206,15 +206,15 @@ def main():
 
     # } 
 
-    # full
-    # comms_dict = {
-    #     1: [2,3,4,5],
-    #     2: [1,3,4,5],
-    #     3: [1,2,4,5],
-    #     4: [1,2,3,5],
-    #     5: [1,2,3,4]
+    # # full
+    comms_dict = {
+        1: [2,3,4,5],
+        2: [1,3,4,5],
+        3: [1,2,4,5],
+        4: [1,2,3,5],
+        5: [1,2,3,4]
 
-    # }
+    }
 
     # edge removed (1,2), T(G) = 2
     # comms_dict = {
@@ -244,11 +244,11 @@ def main():
     # }
 
     # comms_dict = {
-    #     1: [2],
-    #     2: [3],
-    #     3: [4],
-    #     4: [5],
-    #     5: [1]
+    #     1: [5],
+    #     2: [1],
+    #     3: [2],
+    #     4: [3],
+    #     5: [4]
     # }
             
         
@@ -345,11 +345,11 @@ def main():
                 csv_logger=csv_logger,
                 in_transit_packages=in_transit_pkgs
             )
-            plot_initial_map(city, 
-                depots=depots, drones=server.agent_set,
-                package_dict=sim.active_packages,
-                radius_km=sim.distance_thresh,
-                trial=trial)
+            # plot_initial_map(city, 
+            #     depots=depots, drones=server.agent_set,
+            #     package_dict=sim.active_packages,
+            #     radius_km=sim.distance_thresh,
+            #     trial=trial)
             
             timing_per_timestep = [] 
             for t in range(args['timesteps']):
@@ -366,7 +366,7 @@ def main():
                 else:
                     logging.info(f"No active packages available. Skipping assignment.")
 
-                update_routing_sim(sim, server, rng, csv_logger=csv_logger, allow_overlap=allow_overlap)
+                update_routing_sim(trial, sim, server, rng, csv_logger=csv_logger, allow_overlap=allow_overlap)
                 
 
 
