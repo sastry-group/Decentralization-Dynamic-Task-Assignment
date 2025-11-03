@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 probs = [0.5]
 # algos = ["ibr"]
 # algos = ["ibr", "ibr_TG2","ibr_TG3","ibr_TG4", "ibr_seq", "ibr_un"]
-algos = ["ibr_seqtest", "ibr", "ibr_UNtest"]
+algos = ["ibr_random_empty", "ibr_random_greedy", "ibr_reverse_empty", "ibr_reverse_greedy", "ibr_seqOrder_empty", "ibr_seqOrder_greedy"]
 # algos = ["scobaFull", "scobaTG2","scobaTG3","scobaTG4", "scobaSeq", "scobaUn"]
 # algos = ["ibrFull", "ibr"]
-colors = {"ibr_seqtest": "#1f77b4", "ibr": "#ff7f0e", "ibr_UN   test": "#2ca02c"}  # Optional: custom hex colors
+colors = {"ibr_random_empty": "#1f77b4", "ibr_random_greedy": "#ff7f0e", "ibr_reverse_empty": "#2ca02c", "ibr_reverse_greedy": "#d62728", "ibr_seqOrder_empty": "#9467bd", "ibr_seqOrder_greedy": "#4b828c"}  # Optional: custom hex colors
 # colors = {"ibr": "#1f77b4", "ibrFull": "#ff7f0e"}  # Optional: custom hex colors
 # colors = {"ibr_TG3": "#1f77b4", "ibr": "#ff7f0e", "ibr_TG2": "#2ca02c", "ibr_TG4": "#d62728", "ibr_seq": "#9467bd", "ibr_un": "#4b828c"}  # Optional: custom hex colors
 # colors = {"scobaTG3": "#1f77b4", "scobaFull": "#ff7f0e", "scobaTG2": "#2ca02c", "scobaTG4": "#d62728", "scobaSeq": "#9467bd", "scobaUn": "#4b828c"}  # Optional: custom hex colors
@@ -89,7 +89,7 @@ ax.set_xlabel("New‐request probability")
 ax.set_ylabel("Mean fraction of late packages")
 ax.set_ylim(0, 1)
 ax.legend()
-plt.title(f"{n_drones} drones, {n_depots} depots - Full communication graph")
+plt.title(f"{n_drones} drones, {n_depots} depots")
 
 plt.tight_layout()
 plt.savefig(f"results/frac_late_dr{n_drones}_dep{n_depots}_probpt{str(probs[0]).replace('.', '')}_win{window}.png")
@@ -113,7 +113,7 @@ ax.set_xticks(x + (len(algos) - 1) * width / 2)
 ax.set_xticklabels([str(p) for p in probs])
 ax.set_xlabel("New‐request probability")
 ax.set_ylabel("Avg. assignment time per step (s)")
-ax.set_title(f"Computation Time — {n_drones} drones, {n_depots} depots  - Full communication graph")
+ax.set_title(f"Computation Time — {n_drones} drones, {n_depots} depots")
 
 plt.tight_layout()
 ax.legend()

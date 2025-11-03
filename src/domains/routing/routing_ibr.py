@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Any, Set
 from collections import deque
 import logging
 import heapq
+import random
 
 from domains.routing.routing_scoba import delivery_success_prob_common, cdf_travel_time
 from solver.scoba_types import InteractionEvent, MODE, GenericAllocation as RoutingAllocation
@@ -112,7 +113,7 @@ def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
 
 
 def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimulator, rng=None, csv_logger=None,
-                            init_method = "greedy", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False):
+                            init_method = "empty", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False):
 
     # might be redundant but just to separate those at depot without communication constraints
     depots: Dict[int, List[str]] = {}
@@ -209,7 +210,12 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     in_range_by_depot: Dict[int, set] = {}
 
 
-    for depot_num, drones in depots.items():
+    # depot_order = sorted(depots.keys())
+    depot_order = sorted(depots.keys(), reverse=True)
+    # depot_order = random.sample(list(depots.keys()), len(depots))
+    # print(f"Depot order for IBR: {depot_order}")
+    for depot_num in depot_order:
+        drones = depots[depot_num]
         depot_loc = server.agent_set[drones[0]].depot_loc
         
         in_range = set()
@@ -247,7 +253,8 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     best_ies: Dict[str, Tuple[str, float]] = {}
     final_assignment: Dict[str, Tuple[str, float, InteractionEvent]] = {}
 
-    for depot_num, drones in depots.items():
+    for depot_num in depot_order:
+        drones = depots[depot_num]
         assigned_per_depot = []
         
         if init_method == "empty":
@@ -289,6 +296,8 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     # --- Iterative best response (GLOBAL), information-aware ---
     # Important: each drone "sees" only drones from depots in its comms neighborhood.
     k_rounds = 100
+    # Ensure iteration over depots.values() follows depot_order and is deterministic
+    depots = {d: sorted(depots[d]) for d in depot_order if d in depots}
     all_considered_drones = [dn for drones in depots.values() for dn in drones]
 
     rounds_completed = 0
