@@ -65,14 +65,16 @@ for a in algos:
 def plot_metric(metric_dict, ylabel, out_name):
     fig, ax = plt.subplots(figsize=(7, 4))
     for a in algos:
+        linestyle = "--"
         if times[a] is None or metric_dict[a] is None:
             continue
-        ax.plot(times[a], metric_dict[a], marker="o", linestyle="--", linewidth=1, markersize=2,
+        if "greedy" in a:
+            linestyle = "-"
+        ax.plot(times[a], metric_dict[a], marker="o", linestyle=linestyle, linewidth=1, markersize=2,
                 label=a, color=colors.get(a))
     ax.set_xlabel("time")
     ax.set_ylabel(ylabel)
     ax.grid(True, linestyle="--", alpha=0.5)
-    ax.legend(title="algorithm")
     ax.set_title(f"{n_drones} drones, {n_depots} depots, win {window}, prob {probs[0]}")
     fig.tight_layout()
     os.makedirs("results", exist_ok=True)
