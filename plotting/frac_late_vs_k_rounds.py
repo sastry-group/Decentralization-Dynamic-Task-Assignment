@@ -9,13 +9,18 @@ import pandas as pd
 probs = [0.5]
 # algos = ["ibr"]
 # algos = ["ibr", "ibr_TG2","ibr_TG3","ibr_TG4", "ibr_seq", "ibr_un"]
-algos = ["ibr_random_empty", "ibr_random_greedy", "ibr_reverse_empty", "ibr_reverse_greedy", "ibr_seqOrder_empty", "ibr_seqOrder_greedy"]
+# algos = ["full_ibr_empty_fow", "full_ibr_empty_rand", "full_ibr_empty_reverse", "full_ibr_greedy_rand", "full_ibr_greedy_fow", "full_ibr_greedy_reverse"]
 # algos = ["scobaFull", "scobaTG2","scobaTG3","scobaTG4", "scobaSeq", "scobaUn"]
 # algos = ["ibrFull", "ibr"]
-colors = {"ibr_random_empty": "#1f77b4", "ibr_random_greedy": "#ff7f0e", "ibr_reverse_empty": "#2ca02c", "ibr_reverse_greedy": "#d62728", "ibr_seqOrder_empty": "#9467bd", "ibr_seqOrder_greedy": "#4b828c"}  # Optional: custom hex colors
+# colors = {"full_ibr_empty_fow": "#1f77b4", "full_ibr_empty_rand": "#ff7f0e", "full_ibr_empty_reverse": "#2ca02c", "full_ibr_greedy_rand": "#d62728", "full_ibr_greedy_fow": "#9467bd", "full_ibr_greedy_reverse": "#4b828c"}  # Optional: custom hex colors
 # colors = {"ibr": "#1f77b4", "ibrFull": "#ff7f0e"}  # Optional: custom hex colors
 # colors = {"ibr_TG3": "#1f77b4", "ibr": "#ff7f0e", "ibr_TG2": "#2ca02c", "ibr_TG4": "#d62728", "ibr_seq": "#9467bd", "ibr_un": "#4b828c"}  # Optional: custom hex colors
 # colors = {"scobaTG3": "#1f77b4", "scobaFull": "#ff7f0e", "scobaTG2": "#2ca02c", "scobaTG4": "#d62728", "scobaSeq": "#9467bd", "scobaUn": "#4b828c"}  # Optional: custom hex colors
+algos = [ "Seq_ibr_greedy_fow","Seq_ibr_greedy_reverse","Seq_ibr_greedy_rand", "Seq_ibr_empty_fow", "Seq_ibr_empty_rand", "Seq_ibr_empty_reverse" ]
+colors = {"Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
+# algos = ["full_ibr_empty_fow", "full_ibr_empty_rand", "full_ibr_empty_reverse", "full_ibr_greedy_rand", "full_ibr_greedy_fow", "full_ibr_greedy_reverse", "Seq_ibr_greedy_fow","Seq_ibr_greedy_reverse","Seq_ibr_greedy_rand", "Seq_ibr_empty_fow", "Seq_ibr_empty_rand", "Seq_ibr_empty_reverse" ]
+# colors = {"full_ibr_empty_fow": "#1f77b4", "full_ibr_empty_rand": "#ff7f0e", "full_ibr_empty_reverse": "#2ca02c", "full_ibr_greedy_rand": "#d62728", "full_ibr_greedy_fow": "#9467bd", "full_ibr_greedy_reverse": "#4b828c", "Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
+
 
 base_dir = "results/logs"
 csv_name = "computational_efficiency_metrics.csv"  
@@ -51,7 +56,9 @@ for a in algos:
             else:
                 # sum k_rounds across time per trial
                 per_trial = df.groupby("trial", as_index=False).agg(total_krounds=("k_rounds", "sum"))
-                vals = per_trial["total_krounds"].to_numpy(dtype=float)
+                # print(per_trial)
+                vals = per_trial["total_krounds"].to_numpy(dtype=int)
+                print(vals)
                 x_sum[a].append(float(np.nanmean(vals)) if vals.size else np.nan)
 
         # --- Y: late fraction per trial from JSON (late/total), then mean/std across trials ---
@@ -91,8 +98,8 @@ for a in algos:
     )
 
 
-ax.set_xlabel("Total k_round steps (sum across trials)")
-ax.set_ylabel("System Efficiency (mean fraction of late packages)")
+ax.set_xlabel("Total k_round steps (sum across steps, mean across trials)")
+ax.set_ylabel("Fraction of late packages (mean across trials)")
 ax.grid(True, linestyle="--", alpha=0.5)
 ax.set_title(f"{n_drones} drones, {n_depots} depots, win {window}")
 plt.tight_layout()

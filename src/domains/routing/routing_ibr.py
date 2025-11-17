@@ -194,7 +194,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                 # claimants might be set or list; normalize to set
                 if not isinstance(claimants, set):
                     claimants = set(claimants)
-                if claimants & visible_set:   # <- intersection non-empty?
+                if claimants & visible_set:   
                     previous_claim.add(pkg)
         previously_pkgs_visible_to_depot[depot_num] = previous_claim 
         
@@ -210,8 +210,8 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     in_range_by_depot: Dict[int, set] = {}
 
 
-    # depot_order = sorted(depots.keys())
-    depot_order = sorted(depots.keys(), reverse=True)
+    depot_order = sorted(depots.keys())
+    # depot_order = sorted(depots.keys(), reverse=True)
     # depot_order = random.sample(list(depots.keys()), len(depots))
     # print(f"Depot order for IBR: {depot_order}")
     for depot_num in depot_order:
@@ -295,12 +295,12 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
       
     # --- Iterative best response (GLOBAL), information-aware ---
     # Important: each drone "sees" only drones from depots in its comms neighborhood.
-    k_rounds = 100
+    k_rounds = 1
     # Ensure iteration over depots.values() follows depot_order and is deterministic
     depots = {d: sorted(depots[d]) for d in depot_order if d in depots}
     all_considered_drones = [dn for drones in depots.values() for dn in drones]
 
-    rounds_completed = 0
+    rounds_completed = 1
     steps_total = 0
     changes_total = 0
 

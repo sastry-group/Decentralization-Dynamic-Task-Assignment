@@ -5,18 +5,11 @@ import matplotlib.pyplot as plt
 import pandas as pd  
 
 probs = [0.5]
-algos = ["ibr_random_empty", "ibr_random_greedy", "ibr_reverse_empty",
-         "ibr_reverse_greedy", "ibr_seqOrder_empty", "ibr_seqOrder_greedy"]
-colors = {
-    "ibr_random_empty": "#1f77b4",
-    "ibr_random_greedy": "#ff7f0e",
-    "ibr_reverse_empty": "#2ca02c",
-    "ibr_reverse_greedy": "#d62728",
-    "ibr_seqOrder_empty": "#9467bd",
-    "ibr_seqOrder_greedy": "#4b828c",
-}
-
+# algos = ["full_ibr_empty_fow", "full_ibr_empty_rand", "full_ibr_empty_reverse", "full_ibr_greedy_rand", "full_ibr_greedy_fow", "full_ibr_greedy_reverse", "Seq_ibr_greedy_fow","Seq_ibr_greedy_reverse","Seq_ibr_greedy_rand", "Seq_ibr_empty_fow", "Seq_ibr_empty_rand", "Seq_ibr_empty_reverse" ]
+# colors = {"full_ibr_empty_fow": "#1f77b4", "full_ibr_empty_rand": "#ff7f0e", "full_ibr_empty_reverse": "#2ca02c", "full_ibr_greedy_rand": "#d62728", "full_ibr_greedy_fow": "#9467bd", "full_ibr_greedy_reverse": "#4b828c", "Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
 base_dir = "results/logs"
+algos = [ "Seq_ibr_greedy_fow","Seq_ibr_greedy_reverse","Seq_ibr_greedy_rand", "Seq_ibr_empty_fow", "Seq_ibr_empty_rand", "Seq_ibr_empty_reverse" ]
+colors = {"Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
 
 # Extract n_drones / n_depots / window from your sample folder name
 sample_folder = f"dr15_dep5_probpt{str(probs[0]).replace('.','')}_win15_{algos[0]}"
@@ -77,6 +70,7 @@ def plot_metric(metric_dict, ylabel, out_name):
     ax.grid(True, linestyle="--", alpha=0.5)
     ax.set_title(f"{n_drones} drones, {n_depots} depots, win {window}, prob {probs[0]}")
     fig.tight_layout()
+    ax.legend()
     os.makedirs("results", exist_ok=True)
     fig.savefig(out_name, dpi=150)
     plt.close(fig)
