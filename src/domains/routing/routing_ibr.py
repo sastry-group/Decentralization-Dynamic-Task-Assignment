@@ -84,10 +84,11 @@ def compute_utility(ie: InteractionEvent,
 
 
 def delivery_success_prob(std_scale: float, ref_time: float, ie: InteractionEvent) -> float:
-    travel_time = ie.timestamps[MODE.RETURN] - ie.timestamps[MODE.FINISH] # some estimate  trvel time
+    travel_time = ie.travel_time # some estimate  trvel time
     mean = travel_time
     scale = travel_time / std_scale
     x = ie.timestamps[MODE.FINISH] - ref_time  # this is counting what the current time step is 
+
     prob = epanechnikov_cdf(x, mean, scale)
     return prob
 
@@ -113,7 +114,8 @@ def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
 
 
 def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimulator, rng=None, csv_logger=None,
-                            init_method = "greedy", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False):
+                            init_method = "greedy", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False, 
+                            depot_order="asc"):
 
     # might be redundant but just to separate those at depot without communication constraints
     depots: Dict[int, List[str]] = {}
@@ -152,6 +154,19 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
         for dn in drones:
             visible_by_drone[dn] = sorted(x for x in vis_set if x != dn)
 
+
+    logging.info(
+        f"[IBR] t={time_step} now={routing_sim.current_time} "
+        f"active={len(routing_sim.active_packages)} busy={len(routing_sim.busy_packages)} "
+        f"claims={len(getattr(routing_sim,'package_claims',{}))} winners={len(getattr(routing_sim,'package_winners',{}))}"
+    )
+
+
+    for d in sorted(depot_neighbors.keys()):
+        logging.info(f"[IBR] depot {d} sees depots {sorted(depot_neighbors[d])} | drones_at_depot={depots.get(d, [])}")
+
+    for dn in sorted(visible_by_drone.keys()):
+        logging.info(f"[IBR] drone {dn} (depot {server.agent_set[dn].depot_number}) sees drones {visible_by_drone[dn]}")
 
     # REMOVE
     # observers_of = {dn: [] for dn in [x for ds in depots.values() for x in ds]}
@@ -198,7 +213,10 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     previous_claim.add(pkg)
         previously_pkgs_visible_to_depot[depot_num] = previous_claim 
         
-
+    for d in sorted(previously_pkgs_visible_to_depot.keys()):
+        logging.info(
+            f"[IBR] depot {d} previously-visible pkgs: {sorted(previously_pkgs_visible_to_depot[d])}"
+        )
 
     # # Helper: get visible drones for a given agent - REMOVE
     # def get_visible_drones_for_agent(agent_id: str) -> List[str]:
@@ -209,11 +227,13 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
     in_range_by_depot: Dict[int, set] = {}
 
+    if depot_order == "asc":
+        depot_order = sorted(depots.keys())
+    elif depot_order == "desc": 
+        depot_order = sorted(depots.keys(), reverse=True)
+    elif depot_order == "random":
+        depot_order = random.sample(list(depots.keys()), len(depots))
 
-    # depot_order = sorted(depots.keys())
-    depot_order = sorted(depots.keys(), reverse=True)
-    # depot_order = random.sample(list(depots.keys()), len(depots))
-    # print(f"Depot order for IBR: {depot_order}")
     for depot_num in depot_order:
         drones = depots[depot_num]
         depot_loc = server.agent_set[drones[0]].depot_loc
@@ -307,7 +327,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
                 else:
                     best_ies[dn] = (None, 0.0)
-      
+        logging.info(f"[IBR] initial assigned: { {dn: assigned.get(dn) for dn in sorted(assigned)} }")      
     # --- Iterative best response (GLOBAL), information-aware ---
     # Important: each drone "sees" only drones from depots in its comms neighborhood.
     k_rounds = 1
@@ -340,6 +360,13 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
             dnum = server.agent_set[drone].depot_number         
             visible_assigned_pkgs |= previously_pkgs_visible_to_depot.get(dnum, set())
 
+            logging.info(
+                f"[IBR] BR t={time_step} drone={drone} depot={dnum} "
+                f"sees_drones={visible_drones} "
+                f"assigned_visible={assigned_visible} "
+                f"prev_visible_pkgs={sorted(previously_pkgs_visible_to_depot.get(dnum,set()))} "
+                f"blocked_pkgs={sorted(visible_assigned_pkgs)}"
+            )
 
             best_ie = None
             best_util = float("-inf")
@@ -369,6 +396,16 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                 # deterministic tie-break to keep runs reproducible
                 if (u > best_util) or (u == best_util and (best_ie is None or ie.task_name < best_ie.task_name)):
                     best_util, best_ie = u, ie
+            
+            if best_ie:
+                logging.info(
+                    f"[IBR] BR choice drone={drone} choose={best_ie.task_name} "
+                    f"util={best_util:.3f} prev={assigned.get(drone)}"
+                )
+            else:
+                logging.info(
+                    f"[IBR] BR choice drone={drone} choose=None (no feasible candidate)"
+                )
 
             # Commit immediately if the best response changes the action
             if best_ie and assigned.get(drone) != best_ie.task_name:
