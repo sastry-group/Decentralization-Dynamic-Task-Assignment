@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import pandas as pd  
 
 probs = [0.5]
-# algos = ["full_ibr_empty_fow", "full_ibr_empty_rand", "full_ibr_empty_reverse", "full_ibr_greedy_rand", "full_ibr_greedy_fow", "full_ibr_greedy_reverse", "Seq_ibr_greedy_fow","Seq_ibr_greedy_reverse","Seq_ibr_greedy_rand", "Seq_ibr_empty_fow", "Seq_ibr_empty_rand", "Seq_ibr_empty_reverse" ]
-# colors = {"full_ibr_empty_fow": "#1f77b4", "full_ibr_empty_rand": "#ff7f0e", "full_ibr_empty_reverse": "#2ca02c", "full_ibr_greedy_rand": "#d62728", "full_ibr_greedy_fow": "#9467bd", "full_ibr_greedy_reverse": "#4b828c", "Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
+algos = ["full_ibr_empty_fow", "full_ibr_empty_rand", "full_ibr_empty_reverse", "full_ibr_greedy_rand", "full_ibr_greedy_fow", "full_ibr_greedy_reverse", "full_ibr_random_reverse", "full_ibr_random_fow", "full_ibr_random_random"]
+colors = {"full_ibr_empty_fow": "#1f77b4", "full_ibr_empty_rand": "#360eff", "full_ibr_empty_reverse": "#29f8fc", "full_ibr_greedy_rand": "#d62728", "full_ibr_greedy_fow": "#951a0a", "full_ibr_greedy_reverse": "#ef6883", "full_ibr_random_reverse": "#508c4b", "full_ibr_random_fow": "#00ec4f", "full_ibr_random_random": "#4CEE2B"}
+
 base_dir = "results/logs"
-algos = [ "Seq_ibr_greedy_fow","Seq_ibr_greedy_reverse","Seq_ibr_greedy_rand", "Seq_ibr_empty_fow", "Seq_ibr_empty_rand", "Seq_ibr_empty_reverse" ]
-colors = {"Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
+# algos = [ "Seq_ibr_greedy_fow","Seq_ibr_greedy_reverse","Seq_ibr_greedy_rand", "Seq_ibr_empty_fow", "Seq_ibr_empty_rand", "Seq_ibr_empty_reverse" ]
+# colors = {"Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
 
 # Extract n_drones / n_depots / window from your sample folder name
 sample_folder = f"dr15_dep5_probpt{str(probs[0]).replace('.','')}_win15_{algos[0]}"
@@ -56,7 +57,7 @@ for a in algos:
 
 
 def plot_metric(metric_dict, ylabel, out_name):
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=(7, 7))
     for a in algos:
         linestyle = "--"
         if times[a] is None or metric_dict[a] is None:

@@ -113,7 +113,7 @@ def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
 
 
 def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimulator, rng=None, csv_logger=None,
-                            init_method = "empty", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False):
+                            init_method = "greedy", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False):
 
     # might be redundant but just to separate those at depot without communication constraints
     depots: Dict[int, List[str]] = {}
@@ -210,8 +210,8 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     in_range_by_depot: Dict[int, set] = {}
 
 
-    depot_order = sorted(depots.keys())
-    # depot_order = sorted(depots.keys(), reverse=True)
+    # depot_order = sorted(depots.keys())
+    depot_order = sorted(depots.keys(), reverse=True)
     # depot_order = random.sample(list(depots.keys()), len(depots))
     # print(f"Depot order for IBR: {depot_order}")
     for depot_num in depot_order:
@@ -261,13 +261,28 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
             # No pre-assignments; best-response will fill in during k-rounds
             for dn in drones:
                 best_ies[dn] = (None, 0.0)
-        if init_method == "random":
+        elif init_method == "random":
             for dn in drones:
-                events = interaction_events_by_drone.get(dn, [])
-                available_events = [ie for ie in events if ie.task_name not in assigned]
-                if available_events:
-                    ie = rng.choice(available_events)
-                    assigned[dn] = ie.task_name
+
+                events = interaction_events_by_drone.get(dn, [])   
+            if len(events) == 0:
+                best_ies[dn] = (None, 0.0)
+                continue         
+            if allow_overlap is False:
+                available_events = [ie for ie in events if ie.task_name not in assigned_per_depot and ie.task_name not in routing_sim.busy_packages]
+            else:
+                available_events = [ie for ie in events if ie.task_name not in assigned_per_depot and ie.task_name not in previously_pkgs_visible_to_depot[depot_num]]
+
+            # safeguard
+            if len(available_events) == 0:
+                best_ies[dn] = (None, 0.0)
+                continue
+
+            ie = rng.choice(available_events)
+            assigned[dn] = ie.task_name
+            assigned_per_depot.append(ie.task_name)
+            best_ies[dn] = (ie.task_name, 0.0)
+            final_assignment[dn] = (ie.task_name, 0.0, ie)
 
         elif init_method == "greedy":
             for dn in drones:
