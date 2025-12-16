@@ -267,7 +267,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
                         sim.package_registry[package_nm]["winner"] = drone_nm
                         flag = "True"
                         curr_drone_locs_cols.append((pkg_obj.delivery, "green"))
-                        logging.info(f"[WIN] {winner} delivered {pkg} on-time at {delivery}")
+                        logging.info(f"[WIN] {winner} delivered {package_nm} on-time at {delivery}")
                         # Visual at package location handled above; nothing else here.
                             
                     else:
@@ -291,9 +291,16 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
                             "deadline": deadline,
                             "on_time": flag,
                         })
+                    
+                    pkg_ref = sim.busy_packages.get(package_nm) or sim.package_registry[package_nm].get("obj")
+                    if pkg_ref is not None:
+                        sim.done_packages[package_nm] = pkg_ref
                     sim.package_claims.pop(package_nm, None)
                     busy_packages_to_del.add(package_nm)
-                    sim.done_packages[package_nm] = sim.busy_packages[package_nm]
+                    logging.info(f"[CLEANUP] delivered pkg={package_nm} removed claims; claims_now={package_nm in sim.package_claims}")
+
+                    
+                    # sim.done_packages[package_nm] = sim.busy_packages[package_nm]
 
                     # Increment loss with difference from start of window
                     sim.sum_of_delivery_time += delivery - server.agent_task_windows[(drone_nm, package_nm)][0]
@@ -377,6 +384,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
                     # print(f"Package {package_nm} expired without delivery at timestep {sim.current_time}")
                     packages_to_del.add(package_nm)
                     curr_sites_locs_cols.append((rp.delivery, "red"))
+
 
         for r in packages_to_del:
             sim.active_packages.pop(r, None)

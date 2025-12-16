@@ -64,7 +64,7 @@ PARAM_FILES = ROOT / "param_files"
 TRAVELTIME_EST = PARAM_FILES / "scoba_data.npz"
 PARAMS_BY_DEPOTS = {
     2: str(PARAM_FILES / "sf_bb_params_2dpts.toml"),
-    5: str(PARAM_FILES / "sf_bb_params.toml"),
+    5: str(PARAM_FILES / "sf_bb_params_more_overlap.toml"),
 }
 
 DEPOT_COORDS = [
@@ -236,6 +236,7 @@ def parse_commandline():
     p.add_argument("--timesteps", type=int, default=50)
     p.add_argument("--n_drones", type=int, default=6)   
     p.add_argument("--n_depots", type=int, default=2)
+    p.add_argument("--num-init-requests", type=int, default=None, help="Override initial requests. Default is round(1.5 * n_drones).")
     p.add_argument("--new_request_prob", type=float, default=0.5)
     p.add_argument("--time_window", type=int, default=15)
     p.add_argument("--seed", type=int, default=1345)
@@ -251,8 +252,6 @@ def parse_commandline():
     p.add_argument("--init_method", choices=["greedy", "random", "empty"], default="greedy")
     p.add_argument("--allow-overlap", action="store_true",
                    help="Allow overlapping claims (race at arrival). Default: False.")
-    p.add_argument("--num-init-requests", type=int, default=None,
-                   help="Override initial requests. Default is round(1.5 * n_drones).")
 
     p.add_argument("--comms_mode", type=str, default="full")        
     p.add_argument("--depot-order", type=str, default="asc",
@@ -297,8 +296,12 @@ def main():
     init_tag  = args["init_method"]
     order_tag = args["depot_order"]
 
+    num_init = args["num_init_requests"]
+    if num_init is None:
+        num_init = int(round(1.5 * args["n_drones"]))
+
     log_dir = (
-        f"dr{args['n_drones']}_dep{args['n_depots']}"
+        f"dr{args['n_drones']}_dep{args['n_depots']}_pkgnum{num_init}_"
         f"_probpt{str(args['new_request_prob']).replace('.', '')}"
         f"_win{args['time_window']}"
         f"_{args['baseline']}"
@@ -343,9 +346,7 @@ def main():
     drone_ordering, drone_set = build_drones(args["n_drones"], depots)
 
     allow_overlap = bool(args["allow_overlap"])
-    num_init = args["num_init_requests"]
-    if num_init is None:
-        num_init = int(round(1.5 * args["n_drones"]))
+
 
 
     # Build drones
@@ -367,8 +368,6 @@ def main():
                 depot_number=depot_idx,
                 depot_loc=depot.location,
             )
-    num_init = int(round(1.5 * args['n_drones'])) #request number
-    allow_overlap = True
 
     if args["plot_comms"]:
         plot_comms_graph(comms_dict, depots=depots, log_dir=log_dir)
