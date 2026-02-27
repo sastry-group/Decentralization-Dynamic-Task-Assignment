@@ -43,51 +43,23 @@ def welfare_function(task_set: Set[str], delivery_reward=1000.0) -> float:
     unique_tasks = set(task_set)
     return sum(delivery_reward for _ in unique_tasks)
 
-def compute_utility(ie: InteractionEvent,
-                    agent: str,
-                    assigned: Dict[str, str],
-                    server,
-                    routing_sim,
-                    mode="exact",
-                    lambda_conflict=500,
-                    delivery_reward=1000.0):
-    pkg = ie.task_name
-    p_i = delivery_success_prob(
-        std_scale=routing_sim.tt_est_std_scale,
-        ref_time=routing_sim.current_time,
-        ie=ie
-    )
-    profile = dict(assigned)
-    profile[agent] = pkg
-    competitors = [n for n, p in assigned.items() if p == pkg and n != agent]
-    
-    # estimate competitors' probabilities for same pkg using their interaction_events
+#     return u, len(competitors)
 
-    p_sum = p_i
-    for n in competitors:
-        # find that neighbor's ie for this pkg
-        p_n = 0.0
-        for ie_n in server.agent_prop_set[n].interaction_events:
-            if ie_n.task_name == pkg:
-                p_n = delivery_success_prob(
-                    std_scale=routing_sim.tt_est_std_scale,
-                    ref_time=routing_sim.current_time,
-                    ie=ie_n
-                )
-                break
-        p_sum += p_n
+def compute_utility(pkg, agent, assigned_visible, p_cache,
+                           lambda_conflict=500, delivery_reward=1000.0):
+    p_i = p_cache.get((agent, pkg), 0.0)
 
-    # "expected share of winning" proxy
+    competitors = [n for n, p in assigned_visible.items()
+                   if p == pkg and n != agent]
+
+    p_sum = p_i + sum(p_cache.get((n, pkg), 0.0) for n in competitors)
+
     win_share = (p_i / p_sum) if p_sum > 0 else 1.0
     u = delivery_reward * p_i * win_share
     if competitors:
-        u -= lambda_conflict
+        u -= lambda_conflict * len(competitors)
 
-
-
-    logging.info(f"The win share for {agent} on pkg {pkg} is {win_share}, u {u} with p_i={p_i} and p_sum={p_sum} with competitors {competitors}")
     return u, len(competitors)
-
     
 
 
@@ -293,11 +265,20 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     and ie.task_name not in routing_sim.package_claims
                 ]
                 interaction_events_by_drone[dn] = events
+        
+    p_cache = {}  
+    for dn, events in interaction_events_by_drone.items():
+        for ie in events:
+            p_cache[(dn, ie.task_name)] = delivery_success_prob(
+                std_scale=routing_sim.tt_est_std_scale,
+                ref_time=routing_sim.current_time,
+                ie=ie
+            )
     
 
     # --- Initial assignment (per depot)
     assigned: Dict[str, Optional[str]] = {}
-    best_ies: Dict[str, Tuple[str, float]] = {}
+    # best_ies: Dict[str, Tuple[str, float]] = {}
     final_assignment: Dict[str, Tuple[str, float, InteractionEvent]] = {}
 
     for depot_num in depot_order:
@@ -305,15 +286,13 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
         assigned_per_depot = []
         
         if init_method == "empty":
-            # No pre-assignments; best-response will fill in during k-rounds
             for dn in drones:
-                best_ies[dn] = (None, 0.0)
+                assigned[dn] = None
         elif init_method == "random":
             for dn in drones:
-
                 events = interaction_events_by_drone.get(dn, [])   
             if len(events) == 0:
-                best_ies[dn] = (None, 0.0)
+                # best_ies[dn] = (None, 0.0)
                 continue         
             if allow_overlap is False:
                 available_events = [ie for ie in events if ie.task_name not in assigned_per_depot and ie.task_name not in routing_sim.busy_packages]
@@ -322,40 +301,37 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
 
             # safeguard
             if len(available_events) == 0:
-                best_ies[dn] = (None, 0.0)
                 continue
 
             ie = rng.choice(available_events)
             assigned[dn] = ie.task_name
             assigned_per_depot.append(ie.task_name)
-            best_ies[dn] = (ie.task_name, 0.0)
-            final_assignment[dn] = (ie.task_name, 0.0, ie)
 
+            final_assignment[dn] = (ie.task_name, 0.0, ie)
         elif init_method == "greedy":
             for dn in drones:
-                best_ie = None
-                best_util = float("-inf")
-                events = interaction_events_by_drone.get(dn, [])
-                for ie in events:
-                    if allow_overlap is False:
-                        if ie.task_name in assigned_per_depot or ie.task_name in routing_sim.busy_packages:
+                best_ie, best_util = None, float("-inf")
+                for ie in interaction_events_by_drone.get(dn, []):
+                    pkg = ie.task_name
+                    if not allow_overlap:
+                        if pkg in assigned_per_depot or pkg in routing_sim.busy_packages:
                             continue
                     else:
-                        if ie.task_name in assigned_per_depot or ie.task_name in previously_pkgs_visible_to_depot[depot_num]:
+                        if pkg in assigned_per_depot or pkg in previously_pkgs_visible_to_depot[depot_num]:
                             continue
-                    u = delivery_util(routing_sim.delivery_reward, routing_sim.current_time, ie)
-                    logging.info(f"[IBR] init greedy depot={depot_num} drone={dn} candidate={ie.task_name} util={u:.3f}")
+                    u = routing_sim.delivery_reward * p_cache.get((dn, pkg), 0.0)
+
                     if u > best_util:
-                        best_util = u
-                        best_ie = ie
-                if best_ie:
-                    logging.info(f"[IBR] init greedy depot={depot_num} drone={dn} selected={best_ie.task_name} util={best_util:.3f}")
+                        best_util, best_ie = u, ie
+
+                if best_ie is not None:
                     assigned[dn] = best_ie.task_name
                     assigned_per_depot.append(best_ie.task_name)
-                    best_ies[dn] = (best_ie.task_name, best_util)
                     final_assignment[dn] = (best_ie.task_name, best_util, best_ie)
                 else:
-                    best_ies[dn] = (None, 0.0)
+                    assigned[dn] = None
+
+
         logging.info(f"[IBR] initial assigned: { {dn: assigned.get(dn) for dn in sorted(assigned)} }")      
     # --- Iterative best response (GLOBAL), information-aware ---
     # Important: each drone "sees" only drones from depots in its comms neighborhood.
@@ -363,154 +339,84 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     # Ensure iteration over depots.values() follows depot_order and is deterministic
     depots = {d: sorted(depots[d]) for d in depot_order if d in depots}
     all_considered_drones = [dn for drones in depots.values() for dn in drones]
+    rng.shuffle(all_considered_drones)
 
-    rounds_completed = 1
-    steps_total = 0
-    changes_total = 0
-    num_agent_updates = 0
-    num_candidate_evals = 0
-    sum_visible_deg = 0
-    num_visible_samples = 0
-    sum_competitors_counted = 0
-    sum_eval_work = 0
+    rounds_completed = 0
 
     for r in range(1, k_rounds + 1):
         changes_this_round = 0
-        committed = set() 
-        # Only drones at depot can re-choose
+
         for drone in all_considered_drones:
+
             if not server.agent_prop_set[drone].at_depot:
                 continue
 
-            steps_total += 1
-       
-
-            # visible_drones = [other for other in get_visible_drones_for_agent(drone)]
             visible_drones = visible_by_drone.get(drone, [])
-            # if not visible_drones:
-            #     continue
+            assigned_visible = {
+                n: assigned[n]
+                for n in visible_drones
+                if assigned.get(n) is not None
+            }
 
-            competitor_drones = [
-                n for n in visible_drones
-                if (n in committed) or (not server.agent_prop_set[n].at_depot)
-            ]
-            num_agent_updates += 1
-            sum_visible_deg += len(competitor_drones)
-            num_visible_samples += 1
-            # assigned_visible = {n: p for n, p in assigned.items() if n in visible_drones and p is not None}
-            # assigned_visible = {n: assigned[n] for n in visible_drones if assigned.get(n) is not None}
-            assigned_visible = {n: assigned[n] for n in competitor_drones if assigned.get(n) is not None}
-            visible_assigned_pkgs = set(assigned_visible.values())
+            dnum = server.agent_set[drone].depot_number
+            prev_blocked = previously_pkgs_visible_to_depot.get(dnum, set())
 
-            # include previously visible packages for this drone's depot
-            dnum = server.agent_set[drone].depot_number  
-            prev_blocked = previously_pkgs_visible_to_depot.get(dnum, set())       
-            visible_assigned_pkgs |= previously_pkgs_visible_to_depot.get(dnum, set())
             if allow_overlap:
-                blocked_pkgs = set(prev_blocked)         
+                blocked_pkgs = set(prev_blocked)
             else:
-                blocked_pkgs = set(assigned_visible.values()) | set(prev_blocked) | set(routing_sim.busy_packages)
+                blocked_pkgs = (
+                    set(assigned_visible.values())
+                    | set(prev_blocked)
+                    | set(routing_sim.busy_packages)
+                )
 
-            logging.info(
-                f"[IBR] BR t={time_step} drone={drone} depot={dnum} "
-                f"sees_drones={visible_drones} "
-                f"assigned_visible={assigned_visible} "
-                f"prev_visible_pkgs={sorted(previously_pkgs_visible_to_depot.get(dnum,set()))} "
-                f"prev_blocked={sorted(prev_blocked)} "
-                f"blocked_pkgs={sorted(blocked_pkgs)}"
-                f"to check diff visible_assigned_pkgs={sorted(visible_assigned_pkgs)}"
-            )
-
-            
             best_ie = None
-            idle_util = 0.0
-            # best_util = float("-inf")
-            best_util = idle_util
+            best_util = 0.0  # idle utility
 
             for ie in interaction_events_by_drone.get(drone, []):
                 pkg = ie.task_name
 
+                # enforce blocking if desired
+                # if pkg in blocked_pkgs:
+                #     continue
 
-
-                # and then:
-                if pkg in blocked_pkgs:
-                    continue
-
-                # logging.info(f"[DBG] eval drone={drone} pkg={pkg} others_on_pkg={[n for n,p in assigned_visible.items() if p==pkg]}")
-
-
-                u, comp_ct = compute_utility(
-                    ie=ie,
+                u, _ = compute_utility(
+                    pkg=pkg,
                     agent=drone,
-                    assigned=assigned_visible,
-                    server=server,
-                    routing_sim=routing_sim,
-                    mode="exact",
+                    assigned_visible=assigned_visible,
+                    p_cache=p_cache,
                     lambda_conflict=500,
                     delivery_reward=routing_sim.delivery_reward
                 )
-                logging.info(f"[IBR] BR choice drone={drone} candidate={ie.task_name} util={u:.3f}")
-                num_candidate_evals += 1
-                sum_competitors_counted += comp_ct
-                sum_eval_work += 1 + comp_ct 
-                # deterministic tie-break to keep runs reproducible
-                # if (u > best_util) or (u == best_util and (best_ie is None or ie.task_name < best_ie.task_name)):
 
-                #     best_util, best_ie = u, ie
                 if u > best_util:
-                    best_util, best_ie = u, ie
-            
-            if best_ie:
-                logging.info(
-                    f"[IBR] BR choice drone={drone} choose={best_ie.task_name} "
-                    f"util={best_util:.3f} prev={assigned.get(drone)}"
-                )
-            else:
-                logging.info(
-                    f"[IBR] BR choice drone={drone} choose=None (no feasible candidate)"
-                )
+                    best_util = u
+                    best_ie = ie
 
-            # # Commit immediately if the best response changes the action
-            # if best_ie and assigned.get(drone) != best_ie.task_name:
-            #     assigned[drone] = best_ie.task_name
-            #     final_assignment[drone] = (best_ie.task_name, best_util, best_ie)
-            #     changes_this_round += 1
-            #     changes_total += 1
             current_pkg = assigned.get(drone)
-
             new_pkg = best_ie.task_name if best_ie is not None else None
 
             if new_pkg != current_pkg:
                 assigned[drone] = new_pkg
-                
                 if best_ie is not None:
                     final_assignment[drone] = (new_pkg, best_util, best_ie)
                 changes_this_round += 1
-                changes_total += 1
-            committed.add(drone)
+
+        rounds_completed += 1
 
         if changes_this_round == 0:
-            break  # early convergence after a FULL round with zero changes
-        rounds_completed += 1
+            break
+        
 
     
 
     csv_logger.log("computational_efficiency_metrics.csv", {
         "trial": trial_id,
         "time": time_step,
-        "iterations": steps_total,
-        "k_rounds": rounds_completed,
-        "changes": changes_total,
 
-        # NEW: complexity proxies
-        "agent_updates": num_agent_updates,
-        "candidate_evals": num_candidate_evals,
-        "avg_visible_degree": (sum_visible_deg / max(1, num_visible_samples)),
-        "sum_visible_degree": sum_visible_deg,
-        "visible_samples": num_visible_samples,
-        "sum_eval_work": sum_eval_work,
-        "avg_eval_work": sum_eval_work / max(1, num_candidate_evals),
-        "avg_competitors_per_eval": sum_competitors_counted / max(1, num_candidate_evals),
+        "k_rounds": rounds_completed,
+
+
     })
     
     logging.info("[IBR] Final assignments are: " + str(assigned))
