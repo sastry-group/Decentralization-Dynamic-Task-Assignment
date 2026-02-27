@@ -65,6 +65,8 @@ TRAVELTIME_EST = PARAM_FILES / "scoba_data.npz"
 PARAMS_BY_DEPOTS = {
     2: str(PARAM_FILES / "sf_bb_params_2dpts.toml"),
     5: str(PARAM_FILES / "sf_bb_params_more_overlap.toml"),
+    6: str(PARAM_FILES / "sf_bb_params_more_overlap.toml"),
+    10: str(PARAM_FILES / "sf_bb_params_10dpts.toml"),
 }
 
 DEPOT_COORDS = [
@@ -87,8 +89,33 @@ def parse_city_params(toml_path: str):
         'lon_end':   params['LONEND'],
     }
 
+def generate_depot_coords(n_depots: int,
+                          center=(37.76, -122.45),
+                          spacing=0.03):
+    """
+    Generate depot coordinates on a grid around a center.
+    spacing ~ 0.03 ≈ 3km
+    """
+    coords = []
+    side = int(np.ceil(np.sqrt(n_depots)))
+    lat0, lon0 = center
+
+    for i in range(side):
+        for j in range(side):
+            if len(coords) >= n_depots:
+                break
+            lat = lat0 + (i - side // 2) * spacing
+            lon = lon0 + (j - side // 2) * spacing
+            coords.append((lat, lon))
+
+    return coords
+
 def build_depots(n_depots: int) -> dict[int, Depot]:
-    coords = DEPOT_COORDS[:n_depots]
+    if n_depots <= len(DEPOT_COORDS):
+        coords = DEPOT_COORDS[:n_depots]
+    else:
+        coords = generate_depot_coords(n_depots)
+
     return {
         i + 1: Depot(
             depot_id=f"dp{i+1}",
@@ -211,7 +238,94 @@ def comms_graph_from_mode(mode: str, n_depots: int, custom_path=None):
             4: [],
             5: [],
         },
+
+        # ----- 6 depots -----
+        "6_full": {
+            1: [2, 3, 4, 5, 6],
+            2: [1, 3, 4, 5, 6],
+            3: [1, 2, 4, 5, 6],
+            4: [1, 2, 3, 5, 6],
+            5: [1, 2, 3, 4, 6],
+            6: [1, 2, 3, 4, 5],
+        },
+
+        # ring (diameter = 3)
+        "6_ring": {
+            1: [6, 2],
+            2: [1, 3],
+            3: [2, 4],
+            4: [3, 5],
+            5: [4, 6],
+            6: [5, 1],
+        },
+
+        # remove a few long-range edges → higher T(G)
+        "6_edge_rm_12_34_T3": {
+            1: [3, 4, 5, 6],
+            2: [3, 4, 5, 6],
+            3: [1, 2, 5, 6],
+            4: [1, 2, 5, 6],
+            5: [1, 2, 3, 4, 6],
+            6: [1, 2, 3, 4, 5],
+        },
+
+        "6_none": {
+            1: [],
+            2: [],
+            3: [],
+            4: [],
+            5: [],
+            6: [],
+        },
+
+
+        # ----- 10 depots -----
+        "10_full": {
+            i: [j for j in range(1, 11) if j != i]
+            for i in range(1, 11)
+        },
+
+        # ring (diameter = 5)
+        "10_ring": {
+            1: [10, 2],
+            2: [1, 3],
+            3: [2, 4],
+            4: [3, 5],
+            5: [4, 6],
+            6: [5, 7],
+            7: [6, 8],
+            8: [7, 9],
+            9: [8, 10],
+            10: [9, 1],
+        },
+
+        # sparse but connected (banded graph, T(G)≈3–4)
+        "10_band_T3": {
+            i: [j for j in range(1, 11) if 0 < abs(i - j) <= 2]
+            for i in range(1, 11)
+        },
+
+        # very sparse chain (worst-case propagation)
+        "10_chain_T9": {
+            1: [2],
+            2: [1, 3],
+            3: [2, 4],
+            4: [3, 5],
+            5: [4, 6],
+            6: [5, 7],
+            7: [6, 8],
+            8: [7, 9],
+            9: [8, 10],
+            10: [9],
+        },
+
+        "10_none": {
+            i: [] for i in range(1, 11)
+        },
+
     }
+
+
 
     if mode not in EXAMPLES:
         raise ValueError(f"Unknown comms mode: {mode}")
@@ -330,16 +444,18 @@ def main():
     arrs = np.load(str(TRAVELTIME_EST))
     points = arrs["points"]
     estimates = arrs["estimates"]
-    scoba_halton_tree = BallTree(points, metric="euclidean")
+    # scoba_halton_tree = BallTree(points, metric="euclidean")
+    points_rad = np.deg2rad(points)
+    scoba_halton_tree = BallTree(points_rad, metric="haversine")
     travel_time_estimates = estimates
 
 
-    # Load travel-time estimates
-    arrs = np.load(str(ROOT / "param_files" / "scoba_data.npz"))
-    points    = arrs["points"]       # shape (n_points, 2)
-    estimates = arrs["estimates"]    # shape (n_points, n_points)
-    scoba_halton_tree = BallTree(points, metric="euclidean")
-    travel_time_estimates = estimates
+    # # Load travel-time estimates
+    # arrs = np.load(str(ROOT / "param_files" / "scoba_data.npz"))
+    # points    = arrs["points"]       # shape (n_points, 2)
+    # estimates = arrs["estimates"]    # shape (n_points, n_points)
+    # scoba_halton_tree = BallTree(points, metric="euclidean")
+    # travel_time_estimates = estimates
 
     # world
     depots = build_depots(args["n_depots"])
@@ -384,82 +500,6 @@ def main():
     else:
         raise NotImplementedError(baseline)
 
-    #  full - two depots - test
-    # comms_dict = {
-    #     1: [2],
-    #     2: [1],
-
-    # }   
-
-    #  NO COMMS full - two depots - test
-    # comms_dict = {
-    #     1: [],
-    #     2: [],
-
-    # }  
-
-    #  full - three depots - test
-    # comms_dict = {
-    #     1: [2,3],
-    #     2: [1],
-    #     3: [1,2],
-
-    # } 
-
-    # # full
-    
-    # comms_dict = {
-    #     1: [2,3,4,5],
-    #     2: [1,3,4,5],
-    #     3: [1,2,4,5],
-    #     4: [1,2,3,5],
-    #     5: [1,2,3,4]
-
-    # }
-
-    # edge removed (1,2), T(G) = 2
-    # comms_dict = {
-    #     1: [3,4,5],
-    #     2: [1,3,4,5],
-    #     3: [1,2,4,5],
-    #     4: [1,2,3,5],
-    #     5: [1,2,3,4]
-    # }
-    
-    # edge removed (1,2), (3,1) T(G) = 3
-    # comms_dict = {
-    #     1: [3,4,5],
-    #     2: [1,3,4,5],
-    #     3: [2,4,5],
-    #     4: [1,2,3,5],
-    #     5: [1,2,3,4]
-    # }
-    
-    # edge removed (1,2),  (3,1), (4,3), T(G) = 4
-    # comms_dict = {
-    #     1: [3,4,5],
-    #     2: [1,3,4,5],
-    #     3: [2,4,5],
-    #     4: [1,2,5],
-    #     5: [1,2,3,4]
-    # }
-
-    # comms_dict = {
-    #     1: [5],
-    #     2: [1],
-    #     3: [2],
-    #     4: [3],
-    #     5: [4]
-    # }
-            
-        
-    # comms_dict = {
-    #     1: [],
-    #     2: [],
-    #     3: [],
-    #     4: [],
-    #     5: []
-    # }
 
     # Results 
     late_pkgs = []
@@ -470,65 +510,7 @@ def main():
 
     # Run trials
     logging.info(f"Running {args['baseline']} baseline for {trials} trials.")
-    # if args['baseline']=='mcts':
-    #     for i in range(trials):
-                    
-    #         logging.info(f'Trial {i+1}')
-    #         props = {name: DroneProperties(tree=SearchTree(), interaction_events=[])
-    #                   for name in drone_ordering}
-    #         server = RoutingAllocation(
-    #             agent_set=drone_set,
-    #             agent_prop_set=props,
-    #             agent_ordering=drone_ordering,
-    #             max_tasks_to_consider=20,
-    #             conflict_threshold=10
-    #         )
-    #         sim = setup_routing_sim(
-    #             PARAMS_FN, scoba_halton_tree, travel_time_estimates,
-    #             num_init_requests=num_init,
-    #             new_request_prob=args['new_request_prob'],
-    #             time_window_duration=args['time_window'],
-    #             rng=rng
-    #         )
-    #         mdp = RoutingMCTSMDP(sim, server, args['timesteps'])
-    #         agent = RoutingAgent(mdp)
-
-    #         planner = POUCT(
-    #             max_depth=mcts_params["depth"],
-    #             num_sims=mcts_params["trials"],
-    #             discount_factor=1.0,
-    #             exploration_const=mcts_params["explore"],
-    #         )
-
-    #         # tell POUCT which rollout policy to use
-    #         planner.set_rollout_policy(NearestPkgPolicy(mdp))
-
-    #         policy = planner.plan(agent)
-    #         for t in range(args['timesteps']):
-    #             update_time_windows(sim, server)
-    #             update_routing_mcts_fullstate(mdp, rng)
-
-    #             actions = []
-    #             for j in range(args['n_drones']):
-    #                 st = get_current_routing_mcts_state(mdp, j)
-    #                 # now call the new policy correctly:
-    #                 a = policy.action(st)
-    #                 mdp.drone_pkg_assignment[j] = a
-    #                 actions.append(a)
-
-    #             update_server_with_mdp_action(mdp, actions, rng)
-    #             update_routing_sim(sim, server, rng)
-    #         late_pkgs.append(sim.late_packages)
-    #         delivered_pkgs.append(sim.delivered_packages)
-    #         total_pkgs.append(sim.num_total_packages)
-    # else:
-        # Baselines
-        # if args['baseline']=='edd': fn = earliest_due_date
-        # elif args['baseline']=='hungarian': fn = expected_hungarian
-        # elif args['baseline']=='scoba': fn = scoba_routing
-        # elif args['baseline']=='ibr': fn = iterative_best_response
-        # else:
-        #     raise NotImplementedError(f"Baseline method '{args['baseline']}' is not implemented.")
+   
 
     for trial in range(trials):
 
@@ -591,6 +573,7 @@ def main():
                         time_step=t,
                         comms_dict=comms_dict,
                         allow_overlap=allow_overlap,
+                        depot_order=args["depot_order"],
                     )
 
                 timing_per_timestep.append(time.perf_counter() - start)

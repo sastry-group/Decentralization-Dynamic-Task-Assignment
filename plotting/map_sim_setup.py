@@ -33,8 +33,8 @@ def plot_initial_map(city_limits, depots, drones, package_dict, radius_km, trial
     fig, ax = plt.subplots(figsize=(12, 10))
     rng = default_rng(42) 
     legend_elements = []
-    deg_per_km = 1.0 / 110.2
-    radius_deg = radius_km * deg_per_km
+    # deg_per_km = 1.0 / 110.2
+    # radius_deg = radius_km * deg_per_km
 
     # Depots
     cmap_depot = cm.get_cmap('viridis', len(depots))
@@ -42,16 +42,22 @@ def plot_initial_map(city_limits, depots, drones, package_dict, radius_km, trial
     for i, depot in depots.items():
         lon = depot.location.lon
         lat = depot.location.lat
-        circle = patches.Circle(
-            (lon, lat),         # (x, y) = (lon, lat)
-            radius=radius_deg,
+        deg_per_km_lat = 1 / 110.574
+        deg_per_km_lon = 1 / (111.320 * np.cos(np.deg2rad(lat)))
+
+        radius_lat = radius_km * deg_per_km_lat
+        radius_lon = radius_km * deg_per_km_lon
+
+        ellipse = patches.Ellipse(
+            (lon, lat),
+            width=2 * radius_lon,
+            height=2 * radius_lat,
             edgecolor=depot_colors[i-1],
             facecolor=depot_colors[i-1],
             linestyle='--',
-            alpha=0.2,
-            label='Coverage Area' if i-1 == 0 else ""  # only one legend entry
+            alpha=0.2
         )
-        ax.add_patch(circle)
+        ax.add_patch(ellipse)
         ax.scatter(lon, lat,
                 color=depot_colors[i-1], marker='o', s=300, alpha=0.4,
                 label='Depot' if i-1 == 0 else "")
@@ -121,9 +127,10 @@ def plot_initial_map(city_limits, depots, drones, package_dict, radius_km, trial
             ax.add_patch(rect)
             legend_elements.append(Line2D([0], [0], color='black', lw=2, label='City Limits'))
 
-        # Keep aspect roughly correct for degrees (lon degrees shrink with latitude)
+        # # Keep aspect roughly correct for degrees (lon degrees shrink with latitude)
         mid_lat = 0.5 * (lat_min + lat_max)
         ax.set_aspect(1.0 / np.cos(np.deg2rad(mid_lat)), adjustable='box')
+        # ax.set_aspect('equal', adjustable='box')
 
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
