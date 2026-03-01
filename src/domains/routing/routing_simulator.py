@@ -48,7 +48,7 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
 
     # Pick window length relative to nearest depot mean
     mu_nearest = min(approx_travel_times.values())
-    k_low, k_high = 0.8, 1.6
+    k_low, k_high = 0.8, 1.4
     duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
     start = round(current_time + rng.uniform(tw_duration // 2, tw_duration))
     # duration = max(start, approx_travel_times[min(approx_travel_times, key=approx_travel_times.get)] + 2) # safeguard

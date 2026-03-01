@@ -1,9 +1,10 @@
 import numpy as np
 from scipy.stats import gaussian_kde # placeholder for Epanechnikov
-from typing import Dict, List, Tuple, Any
-from collections import namedtuple
+from typing import Dict, List, Tuple, Any, Set
+from collections import namedtuple, defaultdict
 import logging
 import math
+import random
 
 # Solver types
 from solver.scoba_types import DecisionNode, OutcomeNode, SearchTree, InteractionEvent, MODE
@@ -105,7 +106,7 @@ def make_success_prob_fn(sim, server, drone_nm):
 
 
 def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_id=None, time_step=None, 
-                  comms_dict=None, allow_overlap=False) -> None:
+                  comms_dict=None, allow_overlap=False, depot_order=None) -> None:
     """
     Assign tasks to drones using the SC0BA conflict-based allocation algorithm.
     `server` is a RoutingAllocation, `routing_sim` a RoutingSimulator.
@@ -317,75 +318,91 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
         # 1) Group available drones by depot
         # logging.info(f"[t={server.current_time}] Starting SCoBA assignment...")
         available_drones = {}  # depot_number -> [drone_names]
+        depots: Dict[int, List[str]] = {}
         global_depos: Dict[int, List[str]] = {} 
-        for drone_nm, dp in server.agent_prop_set.items():
-            drone = server.agent_set[drone_nm]
-            if dp.at_depot is True:
-                available_drones.setdefault(drone.depot_number, []).append(drone_nm)
-            global_depos.setdefault(drone.depot_number, []).append(drone_nm)
+        # group drones by depot
+        for dn, dp in server.agent_prop_set.items():
+            dnum = server.agent_set[dn].depot_number
+            if dp.at_depot:
+                depots.setdefault(dnum, []).append(dn)
+            global_depos.setdefault(dnum, []).append(dn)
 
+        if not any(depots.values()):
+            logging.info(f"[Scoba] t={time_step} no drones at depot; skipping assignment.")
+            return        
+        
         # Diagnostics to send to CBA
         task_util_allocation = {}       # drone_nm -> TaskUtil(task=<pkg_nm>, util=<value>)
         all_considered_tasks = {}       # drone_nm -> set(pkg_nms)
         assignment_util = 0.0
 
-        all_depots = set(available_drones.keys()) 
-        global_depots = set(global_depos.keys())
+        # Depot info considering communication neighborhoods between depots 
+        all_depots_comm_net = set(depots.keys())
+        global_depots_comm_net = set(global_depos.keys()) 
         if comms_dict is None:
             # fully connected: each depot sees all depots (including itself)
-            depot_neighbors = {d: set(all_depots) for d in all_depots}
-            global_depots_neighbors = {d: set(global_depots) for d in global_depots}
+            depot_neighbors = {d: set(all_depots_comm_net) for d in all_depots_comm_net}
+            global_depots_neighbors = {d: set(global_depots_comm_net) for d in global_depots_comm_net}
         else:
-            depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots}
-            global_depots_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in global_depots}
+            depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots_comm_net }
+            global_depots_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in global_depots_comm_net}
             # Also guard against depots present in comms_dict with no drones right now
             for d in comms_dict.keys():
                 depot_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
                 global_depots_neighbors.setdefault(d, set([d]) | set(comms_dict.get(d, [])))
-    # Map depot -> all drones in its *visible* neighborhood (incl. self depot)
-    visible_drones_by_depot: Dict[int, List[str]] = {}
-    global_visible_drones_by_depot: Dict[int, List[str]] = {}
-
-    for d in depot_neighbors:
-        vis = []
-        for nd in depot_neighbors[d]:
-            vis.extend(available_drones.get(nd, []))
-        visible_drones_by_depot[d] = vis
-
-    for d in global_depots_neighbors:
-        vis = []
-        for nd in global_depots_neighbors[d]:
-            vis.extend(global_depos.get(nd, []))
-        global_visible_drones_by_depot[d] = vis
-
-    previously_pkgs_visible_to_depot = {d: set() for d in global_depos.keys()}
-    
-    for depot_num, drones in global_depos.items():
-        previous_claim = set()
-        visible_set = set(global_visible_drones_by_depot[depot_num])
-        if routing_sim.package_winners:
-            for pkg, winner_dn in routing_sim.package_winners.items():
-                if winner_dn in visible_set:
-                    previous_claim.add(pkg)
         
-        if routing_sim.package_claims:
-            for pkg, claimants in routing_sim.package_claims.items():
-                # claimants might be set or list; normalize to set
-                if not isinstance(claimants, set):
-                    claimants = set(claimants)
-                if claimants & visible_set:   # <- intersection non-empty?
-                    previous_claim.add(pkg)
-        previously_pkgs_visible_to_depot[depot_num] = previous_claim 
+        
+        visible_by_drone = {}
+        for depot_num, drones in depots.items():
+            vis_drones = []
+            for nd in depot_neighbors.get(depot_num, {depot_num}):
+                vis_drones.extend(depots.get(nd, []))
+            vis_set = set(vis_drones)
+            for dn in drones:
+                visible_by_drone[dn] = sorted(x for x in vis_set if x != dn)
 
-        # Helper: get visible drones for a given agent
-        def get_visible_drones_for_agent(agent_id: str) -> List[str]:
-            dnum = server.agent_set[agent_id].depot_number
-            return visible_drones_by_depot.get(dnum, [])
 
-        # --- Precompute interaction events in range per depot ---
-        interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
-        in_range_by_depot: Dict[int, set] = {}
+        # Map depot -> all drones in its *visible* neighborhood (incl. self depot)
+        visible_drones_by_depot: Dict[int, List[str]] = {}
+        global_visible_drones_by_depot: Dict[int, List[str]] = {}
 
+        for d in depot_neighbors:
+            vis = []
+            for nd in depot_neighbors[d]:
+                vis.extend(depots.get(nd, []))
+            visible_drones_by_depot[d] = vis
+
+        for d in global_depots_neighbors:
+            vis = []
+            for nd in global_depots_neighbors[d]:
+                vis.extend(global_depos.get(nd, []))
+            global_visible_drones_by_depot[d] = vis
+
+
+        previously_pkgs_visible_to_depot = {d: set() for d in global_depos.keys()}
+        active_now = set(routing_sim.active_packages.keys())
+    
+        for depot_num, drones in global_depos.items():
+            visible_drones = set(global_visible_drones_by_depot.get(depot_num, []))  # comms neighborhood drones
+            prev = set()
+            for pkg, claimants in getattr(routing_sim, "package_claims", {}).items():
+                if pkg not in active_now:
+                    continue
+                claimants = set(claimants) if not isinstance(claimants, set) else claimants
+                if claimants & visible_drones:
+                    prev.add(pkg)
+            
+            # 2) packages with a winner that is visible, but only if still active
+            # usually short-lived if you pop active on delivery; safe anyway
+            for pkg, winner_dn in getattr(routing_sim, "package_winners", {}).items():
+                if pkg not in active_now:
+                    continue
+                if winner_dn in visible_drones:
+                    prev.add(pkg)
+
+            previously_pkgs_visible_to_depot[depot_num] = prev
+
+        attempting_visible_to_depot: Dict[int, Dict[str, List[str]]] = {d: {} for d in global_depos.keys()}
 
         def util_val_fn(ie):
             return routing_sim.delivery_reward
@@ -394,14 +411,49 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
         def success_prob_factory(drone_nm: str):
             return make_success_prob_fn(routing_sim, server, drone_nm)
 
+        if routing_sim.package_claims:
+            for depot_num in global_depos.keys():
+                visible_set = set(global_visible_drones_by_depot[depot_num])
 
-        # --- Precompute interaction events in range per depot ---
+                who = {}
+                for pkg, claimants in routing_sim.package_claims.items():
+                    if not isinstance(claimants, set):
+                                        claimants = set(claimants)
+                    vis_claimants = sorted(claimants & visible_set)
+                    if vis_claimants:
+                        who[pkg] = vis_claimants
+
+                attempting_visible_to_depot[depot_num] = who
+
+        true_task_util_allocation = {}   # FINAL merged allocation
+        assigned_pkgs = set()            # packages already committed by previous groups
+        assigned_drones = set()          # drones already committed by previous groups
+
+
+        for d in sorted(attempting_visible_to_depot.keys()):
+            logging.info(f"[Scoba] depot {d} visible-attempts: {attempting_visible_to_depot[d]}")
+
+
+        for d in sorted(previously_pkgs_visible_to_depot.keys()):
+            logging.info(
+                f"[Scoba] depot {d} previously-visible pkgs: {sorted(previously_pkgs_visible_to_depot[d])}"
+            )                                                               
+
+            # --- Precompute interaction events in range per depot ---
         interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
         in_range_by_depot: Dict[int, set] = {}
 
+        if depot_order == "asc":
+            depot_order = sorted(depots.keys())
+        elif depot_order == "desc": 
+            depot_order = sorted(depots.keys(), reverse=True)
+        elif depot_order == "random":
+            depot_order = random.sample(list(depots.keys()), len(depots))
+
         # 2) Assign all available drones, grouped by depot
-        for depot_number, depot_drones in available_drones.items():
+        for depot_number in depot_order:
             # Any drone from this depot has the same depot_loc
+            depot_drones = depots[depot_number]
             depot_loc = server.agent_set[depot_drones[0]].depot_loc
 
 
@@ -415,7 +467,13 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                     pkgs_in_range.add(pkg_nm)
             in_range_by_depot[depot_number] = pkgs_in_range
 
+            for dn in depot_drones:
 
+                events = [
+                    ie for ie in server.agent_prop_set[dn].interaction_events
+                    if ie.task_name in pkgs_in_range and ie.task_name not in previously_pkgs_visible_to_depot[depot_number]
+                ]
+                interaction_events_by_drone[dn] = events
             depot_assigned_pkgs = set()
             # Priority ordering among drones from the same depot
             for drone_nm in depot_drones:
@@ -448,24 +506,17 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                         all_considered_tasks[drone_nm] = set(pkgs_to_consider)
 
         # 3) Resolve conflicts across depots via SCoBA coordination    
-        # 
-           
         if task_util_allocation:
             scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
-            if comms_dict is None:
-                # scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
-                true_task_util_allocation = scoba_alg.coordinate_allocation(
-                    task_util_allocation,
-                    all_considered_tasks,
-                    assignment_util,
-                    success_prob_factory,
-                    util_val_fn,
-                    0.0,
-                )
+            no_comms = all(len(neigh) == 0 for neigh in comms_dict.values())
+
+            if no_comms:
+                # No inter-depot communication -> skip SCoBA
+                true_task_util_allocation = task_util_allocation
             else:
                 # print("using dec")
                 # --- Build communication neighborhoods between depots ---
-                depots_to_drones: Dict[int, List[str]] = {d: sorted(dr_list) for d, dr_list in available_drones.items()}
+                depots_to_drones: Dict[int, List[str]] = {d: sorted(dr_list) for d, dr_list in depots.items()}
                 all_depots: Set[int] = set(depots_to_drones.keys()) | set(comms_dict.keys())
                 depot_neighbors = {d: set([d]) | set(comms_dict.get(d, [])) for d in all_depots}
 
@@ -481,11 +532,12 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                     for nd in depot_neighbors[d]:
                         vis.extend(depots_to_drones.get(nd, []))
                     visible_drones_by_depot[d] = vis
-
+                true_task_util_allocation = {}
                 for d in sorted(visible_drones_by_depot.keys()):
-                    group_drones = [dn for dn in visible_drones_by_depot[d]
-                                    if dn in task_util_allocation and dn not in server.agent_task_allocation]
-
+                    group_drones = [
+                        dn for dn in visible_drones_by_depot[d]
+                        if dn in task_util_allocation and dn not in server.agent_task_allocation
+                    ]
                     if not group_drones:
                         continue
                 
@@ -517,22 +569,24 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                     assignment_util_in_group = sum(tu.util for tu in task_util_in_group.values())
 
                     # Run SCoBA just for this depot's visible neighborhood
-                    true_task_util_allocation = scoba_alg.coordinate_allocation(
+                    group_allocation = scoba_alg.coordinate_allocation(
                         task_util_in_group,
-                        considered_tasks_in_group,  # Dict[str, Set[str]]
+                        considered_tasks_in_group,
                         assignment_util_in_group,
                         success_prob_factory,
                         util_val_fn,
                         0.0,
-                    )            
+                    )        
+
+
+                    for dn, tu in group_allocation.items():
+                        true_task_util_allocation[dn] = tu
 
             # there might be redundancies in true_task_util_allocation, ignore them.
             for drone_nm, pkg_util in true_task_util_allocation.items():
                 # Defensive access whether it's a namedtuple/object/dict
                 pkg_nm = pkg_util.task
                 depot_loc = server.agent_set[drone_nm].depot_loc
-                # Ensure drone isn't already assigned
-                assert drone_nm not in server.agent_task_allocation
 
                 if pkg_nm not in previously_pkgs_visible_to_depot[server.agent_set[drone_nm].depot_number]:
                     # Assign (drone -> package) with time = Inf (unknown attempt time placeholder)
@@ -555,10 +609,10 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                     server.agent_prop_set[drone_nm].current_package = pkg_nm
 
                     # Move package from active -> busy
-                    routing_sim.package_claims.setdefault(pkg, set()).add(dn)
-                    routing_sim.package_registry[pkg]["claimed_by"].append(dn)
-                    routing_sim.package_registry[pkg]["time_assigned"].append(time_step)
-                    routing_sim.busy_packages[pkg] = routing_sim.active_packages.get(pkg)
+                    routing_sim.package_claims.setdefault(pkg_nm, set()).add(drone_nm)
+                    routing_sim.package_registry[pkg_nm]["claimed_by"].append(drone_nm)
+                    routing_sim.package_registry[pkg_nm]["time_assigned"].append(time_step)
+                    routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages.get(pkg_nm)
                     # new_busy_package = routing_sim.active_packages[pkg_nm]
                     # routing_sim.busy_packages[pkg_nm] = new_busy_package
                     # routing_sim.active_packages.pop(pkg_nm, None)
@@ -582,4 +636,4 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                             "true_travel_time": rt-td
                             }
                         )   
-            
+                
