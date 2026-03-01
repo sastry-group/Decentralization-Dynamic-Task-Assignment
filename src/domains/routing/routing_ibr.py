@@ -5,7 +5,7 @@ import logging
 import heapq
 import random
 
-from domains.routing.routing_scoba import delivery_success_prob_common, cdf_travel_time
+# from domains.routing.routing_scoba import delivery_success_prob_common, cdf_travel_time
 from solver.scoba_types import InteractionEvent, MODE, GenericAllocation as RoutingAllocation
 from domains.routing.routing_types import RoutingSimulator, EuclideanLatLongMetric, convert_to_vector
 from domains.routing.routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes

@@ -6,25 +6,26 @@ import argparse
 import numpy as np
 from scipy.stats import uniform
 from sklearn.neighbors import BallTree
-from typing import Tuple
-from typing import Any, List, Dict
+
+from typing import List, Dict
 import logging
 
+from .travel_model import delivery_success_prob_common, sample_true_delivery_return_time, travel_time_mean_minutes
 from .routing_types import LatLonCoords, Package, CurrDroneSiteLocs, CityParams, parse_city_params
 from .routing_types import convert_to_vector, EuclideanLatLongMetric
 from solver.scoba_types import InteractionEvent, MODE
 
-TRAVEL = dict(
-    avg_speed_km_per_min = 0.00777 * 60 / 1.2, # ~0.4662 km/min , just a scale factor to icnrease travel times
-    cv = 0.33,           # stdev = cv * mean   (tune 0.2–0.4 to taste)
-    dist = "epanechnikov"  # "epanechnikov" or "normal"
-)
+# TRAVEL = dict(
+#     avg_speed_km_per_min = 0.00777 * 60 / 1.2, # ~0.4662 km/min , just a scale factor to icnrease travel times
+#     cv = 0.33,           # stdev = cv * mean   (tune 0.2–0.4 to taste)
+#     dist = "epanechnikov"  # "epanechnikov" or "normal"
+# )
 
-def travel_time_mean_minutes(loc1: LatLonCoords, loc2: LatLonCoords) -> float:
-    v1, v2 = convert_to_vector(loc1), convert_to_vector(loc2)
-    dist_km = EuclideanLatLongMetric().evaluate(v1, v2)
-    mu = dist_km / TRAVEL["avg_speed_km_per_min"]
-    return max(math.ceil(mu), 3)  # keep your floor of 3 min
+# def travel_time_mean_minutes(loc1: LatLonCoords, loc2: LatLonCoords) -> float:
+#     v1, v2 = convert_to_vector(loc1), convert_to_vector(loc2)
+#     dist_km = EuclideanLatLongMetric().evaluate(v1, v2)
+#     mu = dist_km / TRAVEL["avg_speed_km_per_min"]
+#     return max(math.ceil(mu), 3)  # keep your floor of 3 min
 
 
 
@@ -76,50 +77,50 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
 
 
 
-def sample_true_travel_time(mu: float, rng: np.random.Generator) -> float:
-    sigma = max(TRAVEL["cv"] * mu, 1e-6)
-    if TRAVEL["dist"] == "epanechnikov":
-        # u ~ Epanechnikov with Var(u)=1 using the sqrt(5) trick; std = sigma
-        sqrt5 = 5 ** 0.5
-        while True:
-            u = rng.uniform(-sqrt5, sqrt5)
-            if rng.uniform() <= 0.75 * (1 - (u / sqrt5) ** 2):
-                return max(1.0, round(mu + u * sigma))
-    elif TRAVEL["dist"] == "normal":
-        return max(1.0, round(rng.normal(mu, sigma)))
-    else:
-        raise ValueError("Unknown TRAVEL['dist']")
+# def sample_true_travel_time(mu: float, rng: np.random.Generator) -> float:
+#     sigma = max(TRAVEL["cv"] * mu, 1e-6)
+#     if TRAVEL["dist"] == "epanechnikov":
+#         # u ~ Epanechnikov with Var(u)=1 using the sqrt(5) trick; std = sigma
+#         sqrt5 = 5 ** 0.5
+#         while True:
+#             u = rng.uniform(-sqrt5, sqrt5)
+#             if rng.uniform() <= 0.75 * (1 - (u / sqrt5) ** 2):
+#                 return max(1.0, round(mu + u * sigma))
+#     elif TRAVEL["dist"] == "normal":
+#         return max(1.0, round(rng.normal(mu, sigma)))
+#     else:
+#         raise ValueError("Unknown TRAVEL['dist']")
 
 
 
 
-def sample_true_delivery_return_time(
-    depot_loc: LatLonCoords,
-    delivery_loc: LatLonCoords,
-    window: Tuple[float, float],
-    current_time: float,
-    rng: np.random.Generator
-) -> Tuple[float, float]:
-    """
-    Sample true delivery time (arrive at customer) and true return time (back to depot),
-    using the same uncertainty model as everywhere else.
-    """
-    mu_out = travel_time_mean_minutes(depot_loc, delivery_loc)
-    mu_back = travel_time_mean_minutes(delivery_loc, depot_loc)
+# def sample_true_delivery_return_time(
+#     depot_loc: LatLonCoords,
+#     delivery_loc: LatLonCoords,
+#     window: Tuple[float, float],
+#     current_time: float,
+#     rng: np.random.Generator
+# ) -> Tuple[float, float]:
+#     """
+#     Sample true delivery time (arrive at customer) and true return time (back to depot),
+#     using the same uncertainty model as everywhere else.
+#     """
+#     mu_out = travel_time_mean_minutes(depot_loc, delivery_loc)
+#     mu_back = travel_time_mean_minutes(delivery_loc, depot_loc)
 
-    # sample both legs with the same distribution family & CV
-    tt_out = sample_true_travel_time(mu_out, rng)
-    tt_back = sample_true_travel_time(mu_back, rng)
+#     # sample both legs with the same distribution family & CV
+#     tt_out = sample_true_travel_time(mu_out, rng)
+#     tt_back = sample_true_travel_time(mu_back, rng)
 
-    # depart immediately; arrive at
-    td = round(current_time + tt_out)
-    # respect time window start: wait if early
-    td = max(td, window[0])
+#     # depart immediately; arrive at
+#     td = round(current_time + tt_out)
+#     # respect time window start: wait if early
+#     td = max(td, window[0])
 
-    # return after (waiting does not reduce flight time)
-    rt = round(td + tt_back)
+#     # return after (waiting does not reduce flight time)
+#     rt = round(td + tt_back)
 
-    return td, rt
+#     return td, rt
 
 
 
