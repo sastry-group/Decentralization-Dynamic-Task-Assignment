@@ -22,6 +22,8 @@ TaskUtil = namedtuple("TaskUtil", ["task", "util"])
 
 def make_success_prob_fn(server, drone_nm):
     def success_prob(ref_time, ie):
+        # print("DEBUG ref_time:", ref_time, "server.current_time:", server.current_time, "ie:", ie.task_name, ie.agent_name, ie.timestamps)
+        # ref_time here is scoba is at the node time when the drone becomes available at that node
         return delivery_success_prob(
             ref_time=ref_time,
             ie=ie,
