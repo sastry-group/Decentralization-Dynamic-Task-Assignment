@@ -13,97 +13,24 @@ from solver.scoba_conflict_resolution import SCoBAAlgorithm
 
 from domains.routing.routing_types import EuclideanLatLongMetric, convert_to_vector
 from domains.routing.routing_simulator import sample_true_delivery_return_time
-from domains.routing.travel_model import delivery_success_prob_common
+from domains.routing.travel_model import delivery_success_prob
 
 
 TaskUtil = namedtuple("TaskUtil", ["task", "util"])
 
 
-# TRAVEL = dict(
-#     avg_speed_km_per_min = 0.00777 * 60 / 1.2, # ~0.4662 km/min , just a scale factor to icnrease travel times
-#     cv = 0.33,           # stdev = cv * mean   (tune 0.2–0.4 to taste)
-#     dist = "epanechnikov"  # "epanechnikov" or "normal"
-# )
 
-
-def delivery_util(reward: float, ie):
-    """Constant utility; included for API parity."""
-    return reward
-
-def delivery_util_vec(reward: float, ies):
-    """Vectorized: returns an array of rewards (one per event)."""
-    n = len(ies)
-    return np.full(n, reward, dtype=float)
-
-# def _epanechnikov_cdf_u(u):
-#     """CDF of Epanechnikov kernel for standardized u in [-1,1]."""
-#     u = np.asarray(u, dtype=float)
-#     out = np.empty_like(u)
-#     out[u <= -1] = 0.0
-#     out[u >= 1]  = 1.0
-#     mid = (u > -1) & (u < 1)
-#     um = u[mid]
-#     out[mid] = 0.5 + 0.75*(um - (um**3)/3.0)
-#     return out
-
-# def travel_time_mean_minutes(loc1, loc2) -> float:
-#     v1, v2 = convert_to_vector(loc1), convert_to_vector(loc2)
-#     dist_km = EuclideanLatLongMetric().evaluate(v1, v2)
-#     mu = dist_km / TRAVEL["avg_speed_km_per_min"]
-#     return max(math.ceil(mu), 3)
-
-# def cdf_travel_time(t_available: float, mu: float) -> float:
-#     """P(T_out <= t_available) under the configured TRAVEL model."""
-#     if t_available <= 0:
-#         return 0.0
-#     cv = TRAVEL["cv"]
-#     sigma = max(cv * mu, 1e-6)
-#     if TRAVEL["dist"].lower() == "epanechnikov":
-#         u = (t_available - mu) / sigma
-#         return float(_epanechnikov_cdf_u(u))
-#     elif TRAVEL["dist"].lower() == "normal":
-#         # Normal CDF without importing scipy
-#         z = (t_available - mu) / sigma
-#         return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-#     else:
-#         raise ValueError(f"Unknown TRAVEL['dist']: {TRAVEL['dist']}")
-
-
-# def delivery_success_prob_common(
-#     depot_loc,
-#     pkg_loc,
-#     ref_time: float,
-#     ie
-# ) -> float:
-#     """
-#     Probability of delivering within the package's latest time,
-#     if the drone attempts at max(ref_time, window start).
-#     """
-#     start_t  = ie.timestamps[MODE.START]
-#     finish_t = ie.timestamps[MODE.FINISH]
-#     attempt_t = max(ref_time, start_t)          # can't start before window OR before you're free
-#     slack = finish_t - attempt_t                # time available to fly outbound
-#     mu_out = travel_time_mean_minutes(depot_loc, pkg_loc)
-#     return cdf_travel_time(slack, mu_out)
-
-
-def make_success_prob_fn(sim, server, drone_nm):
-    depot_loc = server.agent_set[drone_nm].depot_loc
-
+def make_success_prob_fn(server, drone_nm):
     def success_prob(ref_time, ie):
-        pkg_nm = getattr(ie, "task_name", None)
-        # Prefer active pkgs (tree is built over actives)
-        if pkg_nm in sim.active_packages:
-            pkg_loc = sim.active_packages[pkg_nm].delivery
-        elif pkg_nm in sim.busy_packages:
-            pkg_loc = sim.busy_packages[pkg_nm].delivery
-        else:
-            # Fallback: look up from server windows if needed
-            # (should rarely happen in tree generation)
-            return 0.0
-        return delivery_success_prob_common(depot_loc, pkg_loc, ref_time, ie)
+        return delivery_success_prob(
+            ref_time=ref_time,
+            ie=ie,
+            std_scale=server.tt_est_std_scale
+        )
 
     return success_prob
+
+
 
 
 def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_id=None, time_step=None, 
@@ -132,7 +59,7 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
         
         # a factory the coordinator can call: given drone -> returns (ref_time, ie) -> prob
         def success_prob_factory(drone_nm: str):
-            return make_success_prob_fn(routing_sim, server, drone_nm)
+            return make_success_prob_fn(server, drone_nm)
 
 
 
@@ -410,7 +337,7 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
         
         # a factory the coordinator can call: given drone -> returns (ref_time, ie) -> prob
         def success_prob_factory(drone_nm: str):
-            return make_success_prob_fn(routing_sim, server, drone_nm)
+            return make_success_prob_fn(server, drone_nm)
 
         if routing_sim.package_claims:
             for depot_num in global_depos.keys():

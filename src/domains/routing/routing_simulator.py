@@ -10,7 +10,7 @@ from sklearn.neighbors import BallTree
 from typing import List, Dict
 import logging
 
-from .travel_model import delivery_success_prob_common, sample_true_delivery_return_time, travel_time_mean_minutes
+from .travel_model import  sample_true_delivery_return_time, travel_time_mean_minutes
 from .routing_types import LatLonCoords, Package, CurrDroneSiteLocs, CityParams, parse_city_params
 from .routing_types import convert_to_vector, EuclideanLatLongMetric
 from solver.scoba_types import InteractionEvent, MODE

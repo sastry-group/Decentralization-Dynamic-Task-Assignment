@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from typing import Tuple
+from solver.scoba_types import InteractionEvent
 from domains.routing.routing_types import EuclideanLatLongMetric, convert_to_vector
 from .routing_types import LatLonCoords, Package, CurrDroneSiteLocs, CityParams, parse_city_params
 from solver.scoba_types import MODE
@@ -19,18 +20,25 @@ def travel_time_mean_minutes(loc1, loc2) -> float:
     return max(math.ceil(mu), 3)
 
 
+def _epanechnikov_cdf_u(u: float) -> float:
+    """
+    CDF of standardized Epanechnikov with support [-1,1].
+    """
+    if u <= -1.0:
+        return 0.0
+    if u >= 1.0:
+        return 1.0
+    return 0.5 + 0.75 * (u - (u**3) / 3.0)
 
-def _epanechnikov_cdf_u(u):
-    """CDF of Epanechnikov kernel for standardized u in [-1,1]."""
-    u = np.asarray(u, dtype=float)
-    out = np.empty_like(u)
-    out[u <= -1] = 0.0
-    out[u >= 1]  = 1.0
-    mid = (u > -1) & (u < 1)
-    um = u[mid]
-    out[mid] = 0.5 + 0.75*(um - (um**3)/3.0)
-    return out
+def epanechnikov_cdf(x: float, mean: float, sigma: float) -> float:
+    """
+    Epanechnikov CDF with mean and standard deviation sigma.
+    """
+    if sigma <= 0:
+        return 1.0 if x >= mean else 0.0
 
+    u = (x - mean) / sigma
+    return _epanechnikov_cdf_u(u)
 
 
 def cdf_travel_time(t_available: float, mu: float) -> float:
@@ -49,25 +57,11 @@ def cdf_travel_time(t_available: float, mu: float) -> float:
     else:
         raise ValueError(f"Unknown TRAVEL['dist']: {TRAVEL['dist']}")
     
-
-
-
-def delivery_success_prob_common(
-    depot_loc,
-    pkg_loc,
-    ref_time: float,
-    ie
-) -> float:
-    """
-    Probability of delivering within the package's latest time,
-    if the drone attempts at max(ref_time, window start).
-    """
-    start_t  = ie.timestamps[MODE.START]
-    finish_t = ie.timestamps[MODE.FINISH]
-    attempt_t = max(ref_time, start_t)          # can't start before window OR before you're free
-    slack = finish_t - attempt_t                # time available to fly outbound
-    mu_out = travel_time_mean_minutes(depot_loc, pkg_loc)
-    return cdf_travel_time(slack, mu_out)
+def delivery_success_prob(ref_time: float, ie: InteractionEvent, std_scale: float) -> float:
+    mu = ie.travel_time
+    sigma = mu / std_scale
+    x = ie.timestamps[MODE.FINISH] - ref_time
+    return epanechnikov_cdf(x, mu, sigma)
 
 
 def sample_true_travel_time(mu: float, rng: np.random.Generator) -> float:
