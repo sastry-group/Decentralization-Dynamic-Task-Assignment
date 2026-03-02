@@ -10,6 +10,7 @@ from solver.scoba_types import InteractionEvent, MODE, GenericAllocation as Rout
 from domains.routing.routing_types import RoutingSimulator, EuclideanLatLongMetric, convert_to_vector
 from domains.routing.routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes
 from domains.graph_builder import build_comm_structure
+from .travel_model import delivery_success_prob
 
 
 
@@ -28,68 +29,106 @@ def create_comm_graph(depots: Dict[int, List[str]]) -> Dict[str, List[str]]:
 
 
 
-def delivery_util(reward: float, ref_time: float, ie: InteractionEvent) -> float:
+# def delivery_util(reward: float, ref_time: float, ie: InteractionEvent) -> float:
 
     
-    # Compute a realistic utility as expected reward
-    p_succ = delivery_success_prob(std_scale=2.0, 
-                                   ref_time=ref_time,
-                                   ie=ie)
+#     # Compute a realistic utility as expected reward
+#     p_succ = delivery_success_prob(std_scale=2.0, 
+#                                    ref_time=ref_time,
+#                                    ie=ie)
     
-    return reward * p_succ
+#     return reward * p_succ
 
 
-def welfare_function(task_set: Set[str], delivery_reward=1000.0) -> float:
-    unique_tasks = set(task_set)
-    return sum(delivery_reward for _ in unique_tasks)
+def group_welfare(assignments, group, p_cache, reward):
+    # assignments: dict drone->pkg (pkg can be None)
+    # group: iterable of drones to include
+    # returns sum_t reward * max_{drone in group assigned to t} p(drone,t)
+    best_by_pkg = {}
+    for dn in group:
+        pkg = assignments.get(dn)
+        if pkg is None:
+            continue
+        p = p_cache.get((dn, pkg), 0.0)
+        if (pkg not in best_by_pkg) or (p > best_by_pkg[pkg]):
+            best_by_pkg[pkg] = p
+    return reward * sum(best_by_pkg.values())
 
 #     return u, len(competitors)
 
-def compute_utility(pkg, agent, assigned_visible, p_cache,
-                           lambda_conflict=500, delivery_reward=1000.0):
-    p_i = p_cache.get((agent, pkg), 0.0)
 
-    competitors = [n for n, p in assigned_visible.items()
-                   if p == pkg and n != agent]
+# def expected_group_utility(pkg, agent, assigned_visible, p_cache,
+#                     delivery_reward=1000.0):
 
-    p_sum = p_i + sum(p_cache.get((n, pkg), 0.0) for n in competitors)
+#     p_i = p_cache.get((agent, pkg), 0.0)
 
-    win_share = (p_i / p_sum) if p_sum > 0 else 1.0
-    u = delivery_reward * p_i * win_share
-    if competitors:
-        u -= lambda_conflict * len(competitors)
+#     competitors = [
+#         n for n, p in assigned_visible.items()
+#         if p == pkg and n != agent
+#     ]
 
-    return u, len(competitors)
+#     p_sum = p_i + sum(p_cache.get((n, pkg), 0.0) for n in competitors)
+
+#     if p_sum <= 0:
+#         return 0.0, len(competitors)
+
+#     u = delivery_reward * (p_i ** 2 / p_sum)
+
+#     return u, len(competitors)
+def group_welfare(assignments, group, p_cache, reward):
+    best_by_pkg = {}
+    for dn in group:
+        pkg = assignments.get(dn)
+        if pkg is None:
+            continue
+        p = p_cache.get((dn, pkg), 0.0)
+        if (pkg not in best_by_pkg) or (p > best_by_pkg[pkg]):
+            best_by_pkg[pkg] = p
+        # print(f"Drone {dn} assigned to pkg {pkg} with p={p:.2f}")
     
+    return reward * sum(best_by_pkg.values())
+
+def compute_utility(pkg, agent, assigned, group, p_cache, reward):
+    # print(f"Computing utility for agent {agent} considering pkg {pkg} and group {group}")
+    # baseline: agent idle
+    base = dict(assigned)
+    base[agent] = None
+    w0 = group_welfare(base, group, p_cache, reward)
+
+    # candidate: agent chooses pkg
+    cand = dict(assigned)
+    cand[agent] = pkg
+    w1 = group_welfare(cand, group, p_cache, reward)
+    # print(f"Utility if idle: {w0:.2f}, Utility if take pkg: {w1:.2f}")
+
+    return w1 - w0
+
+# def delivery_success_prob(std_scale: float, ref_time: float, ie: InteractionEvent) -> float:
+#     travel_time = ie.travel_time # some estimate  trvel time
+#     mean = travel_time
+#     scale = travel_time / std_scale
+#     x = ie.timestamps[MODE.FINISH] - ref_time  # this is counting what the current time step is 
+
+#     prob = epanechnikov_cdf(x, mean, scale)
+#     return prob
 
 
+# def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
+#     """
+#     Compute the Epanechnikov CDF at x, with given mean and scale.
+#     Support is [mean - sqrt(5)*scale, mean + sqrt(5)*scale].
+#     """
+#     sqrt5 = 5 ** 0.5
+#     a = mean - sqrt5 * scale
+#     b = mean + sqrt5 * scale
 
-def delivery_success_prob(std_scale: float, ref_time: float, ie: InteractionEvent) -> float:
-    travel_time = ie.travel_time # some estimate  trvel time
-    mean = travel_time
-    scale = travel_time / std_scale
-    x = ie.timestamps[MODE.FINISH] - ref_time  # this is counting what the current time step is 
-
-    prob = epanechnikov_cdf(x, mean, scale)
-    return prob
-
-
-def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
-    """
-    Compute the Epanechnikov CDF at x, with given mean and scale.
-    Support is [mean - sqrt(5)*scale, mean + sqrt(5)*scale].
-    """
-    sqrt5 = 5 ** 0.5
-    a = mean - sqrt5 * scale
-    b = mean + sqrt5 * scale
-
-    if x <= a:
-        return 0.0
-    elif x >= b:
-        return 1.0
-    else:
-        z = (x - mean) / scale
-        return 0.75 * (z / sqrt5 - (z ** 3) / (3 * sqrt5 ** 3)) + 0.5
+#     if x <= a:
+#         return 0.0
+#     elif x >= b:
+#         return 1.0
+#     else:
+#         z = (x - mean) / scale
+#         return 0.75 * (z / sqrt5 - (z ** 3) / (3 * sqrt5 ** 3)) + 0.5
 
 
 
@@ -270,9 +309,9 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     for dn, events in interaction_events_by_drone.items():
         for ie in events:
             p_cache[(dn, ie.task_name)] = delivery_success_prob(
-                std_scale=routing_sim.tt_est_std_scale,
                 ref_time=routing_sim.current_time,
-                ie=ie
+                ie=ie,
+                std_scale=routing_sim.tt_est_std_scale,
             )
     
 
@@ -380,14 +419,20 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                 # if pkg in blocked_pkgs:
                 #     continue
 
-                u, _ = compute_utility(
+                group = [drone] + visible_by_drone.get(drone, [])
+
+                # IMPORTANT: use the CURRENT assignments for the group, not assigned_visible
+                assigned_group = {dn: assigned.get(dn) for dn in group}
+
+                u = compute_utility(
                     pkg=pkg,
                     agent=drone,
-                    assigned_visible=assigned_visible,
+                    assigned=assigned_group,
+                    group=group,
                     p_cache=p_cache,
-                    lambda_conflict=500,
-                    delivery_reward=routing_sim.delivery_reward
+                    reward=routing_sim.delivery_reward
                 )
+
 
                 if u > best_util:
                     best_util = u
@@ -401,6 +446,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                 if best_ie is not None:
                     final_assignment[drone] = (new_pkg, best_util, best_ie)
                 changes_this_round += 1
+            # print(f"Time step {time_step} Round {r}, Drone {drone}: current pkg={current_pkg}, new pkg={new_pkg}, best util={best_util:.2f}")
 
         rounds_completed += 1
 

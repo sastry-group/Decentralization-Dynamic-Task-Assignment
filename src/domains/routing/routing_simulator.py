@@ -375,16 +375,20 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             sim.done_packages.pop(r, None)
 
         # 3) Handle active packages that expired without any winner
+         # give some grace period at start  
+
         packages_to_del = set()
         for package_nm, rp in list(sim.active_packages.items()):
             if rp.time_window[1] < sim.current_time:
                 # No one delivered in time
+                packages_to_del.add(package_nm)
                 if package_nm not in sim.package_claims:
                     logging.info(f"{package_nm} expired without successful delivery")
                     sim.late_packages += 1
                     # print(f"Package {package_nm} expired without delivery at timestep {sim.current_time}")
-                    packages_to_del.add(package_nm)
+                    
                     curr_sites_locs_cols.append((rp.delivery, "red"))
+
 
 
         for r in packages_to_del:

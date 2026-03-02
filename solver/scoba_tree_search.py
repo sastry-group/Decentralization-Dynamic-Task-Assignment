@@ -148,6 +148,7 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
 
 
         if ie_stamp < first_ie_stamp:
+            
             utilval = util_val_fn(ie)
             new_outcomes, new_dec_leaf = insert_decision_node(
                 tree, agent_name, ie, 0, server.current_time, utilval, success_prob_fn

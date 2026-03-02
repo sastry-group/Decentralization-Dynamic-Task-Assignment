@@ -12,22 +12,22 @@ from solver.scoba_tree_search import generate_search_tree, get_next_attempt_idx
 from solver.scoba_conflict_resolution import SCoBAAlgorithm
 
 from domains.routing.routing_types import EuclideanLatLongMetric, convert_to_vector
-from domains.routing.routing_simulator import sample_true_delivery_return_time
-from domains.routing.travel_model import delivery_success_prob
+# from domains.routing.routing_simulator import sample_true_delivery_return_time
+from domains.routing.travel_model import delivery_success_prob, sample_true_delivery_return_time
 
 
 TaskUtil = namedtuple("TaskUtil", ["task", "util"])
 
 
 
-def make_success_prob_fn(server, drone_nm):
+def make_success_prob_fn(std_scale, drone_nm):
     def success_prob(ref_time, ie):
         # print("DEBUG ref_time:", ref_time, "server.current_time:", server.current_time, "ie:", ie.task_name, ie.agent_name, ie.timestamps)
         # ref_time here is scoba is at the node time when the drone becomes available at that node
         return delivery_success_prob(
             ref_time=ref_time,
             ie=ie,
-            std_scale=server.tt_est_std_scale
+            std_scale=std_scale
         )
 
     return success_prob
@@ -61,7 +61,7 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
         
         # a factory the coordinator can call: given drone -> returns (ref_time, ie) -> prob
         def success_prob_factory(drone_nm: str):
-            return make_success_prob_fn(server, drone_nm)
+            return make_success_prob_fn(routing_sim.tt_est_std_scale, drone_nm)
 
 
 
@@ -339,7 +339,7 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
         
         # a factory the coordinator can call: given drone -> returns (ref_time, ie) -> prob
         def success_prob_factory(drone_nm: str):
-            return make_success_prob_fn(server, drone_nm)
+            return make_success_prob_fn(routing_sim.tt_est_std_scale, drone_nm)
 
         if routing_sim.package_claims:
             for depot_num in global_depos.keys():

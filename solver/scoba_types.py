@@ -53,7 +53,7 @@ class GenericAllocation:
     agent_ordering: List[str]              = field(default_factory=list)
     max_tasks_to_consider: int             = 100_000
     conflict_threshold: int                = 100
-    tt_est_std_scale: float                = 2.0
+
 
 # mark it as the common base class for your sim
 class MRTAEnvironment: pass
