@@ -20,14 +20,23 @@ probs = [0.5]
 # colors = {"Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
 # algos = ["full_ibr_empty_fow", "full_ibr_empty_rand", "full_ibr_empty_reverse", "full_ibr_greedy_rand", "full_ibr_greedy_fow", "full_ibr_greedy_reverse", "Seq_ibr_greedy_fow","Seq_ibr_greedy_reverse","Seq_ibr_greedy_rand", "Seq_ibr_empty_fow", "Seq_ibr_empty_rand", "Seq_ibr_empty_reverse" ]
 # colors = {"full_ibr_empty_fow": "#1f77b4", "full_ibr_empty_rand": "#ff7f0e", "full_ibr_empty_reverse": "#2ca02c", "full_ibr_greedy_rand": "#d62728", "full_ibr_greedy_fow": "#9467bd", "full_ibr_greedy_reverse": "#4b828c", "Seq_ibr_greedy_fow": "#8c564b", "Seq_ibr_greedy_reverse": "#e377c2", "Seq_ibr_greedy_rand": "#7f7f7f", "Seq_ibr_empty_fow": "#17becf", "Seq_ibr_empty_rand": "#bcbd22", "Seq_ibr_empty_reverse": "#7f7f7f"}
-algos = ["full_ibr_empty_fow", "full_ibr_empty_rand", "full_ibr_empty_reverse", "full_ibr_greedy_rand", "full_ibr_greedy_fow", "full_ibr_greedy_reverse", "full_ibr_random_reverse", "full_ibr_random_fow", "full_ibr_random_random"]
-colors = {"full_ibr_empty_fow": "#1f77b4", "full_ibr_empty_rand": "#360eff", "full_ibr_empty_reverse": "#29f8fc", "full_ibr_greedy_rand": "#d62728", "full_ibr_greedy_fow": "#951a0a", "full_ibr_greedy_reverse": "#ef6883", "full_ibr_random_reverse": "#508c4b", "full_ibr_random_fow": "#00ec4f", "full_ibr_random_random": "#4CEE2B"}
-
+algos = [
+    "ibr_comms-2_full",
+    "ibr_comms-2_none",
+    "scoba_comms-2_full",
+    "scoba_comms-2_none",
+]
+colors = {
+    "ibr_comms-2_full": "#1f77b4",
+    "ibr_comms-2_none": "#ff7f0e",
+    "scoba_comms-2_full": "#2ca02c",
+    "scoba_comms-2_none": "#d62728",
+}
 
 base_dir = "results/logs"
 csv_name = "computational_efficiency_metrics.csv"  
 
-sample_folder = f"dr15_dep5_probpt{str(probs[0]).replace('.','')}_win15_{algos[0]}"
+sample_folder = f"dr5_dep2_pkgnum5_ntrials100_probpt{str(probs[0]).replace('.','')}_win10_{algos[0]}"
 m = re.search(r"dr(\d+)_dep(\d+)_probpt(\d+)_win(\d+)", sample_folder)
 if m:
     n_drones, n_depots, prob_str, window = m.groups()

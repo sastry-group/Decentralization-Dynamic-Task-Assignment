@@ -415,7 +415,8 @@ def main():
         num_init = int(round(1.5 * args["n_drones"]))
 
     log_dir = (
-        f"dr{args['n_drones']}_dep{args['n_depots']}_pkgnum{num_init}_"
+        f"dr{args['n_drones']}_dep{args['n_depots']}_pkgnum{num_init}"
+        f"_ntrials{trials}"
         f"_probpt{str(args['new_request_prob']).replace('.', '')}"
         f"_win{args['time_window']}"
         f"_{args['baseline']}"

@@ -125,7 +125,7 @@ require = {
     "commsk": "10",
     # comms/init/dporder left None => plot all that match
     "comms": None,
-    "init": "greedy",
+    "init": "empty",
     "dporder": "asc",
 }
 
