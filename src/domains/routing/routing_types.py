@@ -108,9 +108,10 @@ class RoutingSimulator:
     sum_of_delivery_time: float         = 0.0
     time_scale: float                   = 60.0  #  I think to transfor from minutes to seconds
     true_delivery_return: Dict[Tuple[str, str], Tuple[float, float]] = field(default_factory=dict)
-    tt_est_std_scale: float             = 2.0
+    tt_est_std_scale: float             = 3.0
     distance_thresh: float              = 5.0 # kilometers
     curr_drone_site_locs: CurrDroneSiteLocs = field(default_factory=CurrDroneSiteLocs)
     depots: Dict[str, LatLonCoords] = field(default_factory=dict)
+    new_packages_created: bool = False
 
 

@@ -14,6 +14,7 @@ from .travel_model import  sample_true_delivery_return_time, travel_time_mean_mi
 from .routing_types import LatLonCoords, Package, CurrDroneSiteLocs, CityParams, parse_city_params
 from .routing_types import convert_to_vector, EuclideanLatLongMetric
 from solver.scoba_types import InteractionEvent, MODE
+from plotting.map_sim_setup import plot_initial_map
 
 # TRAVEL = dict(
 #     avg_speed_km_per_min = 0.00777 * 60 / 1.2, # ~0.4662 km/min , just a scale factor to icnrease travel times
@@ -50,8 +51,10 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
     # Pick window length relative to nearest depot mean
     mu_nearest = min(approx_travel_times.values())
     k_low, k_high = 0.8, 1.4
+    # duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
     duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
     start = round(current_time + rng.uniform(tw_duration // 2, tw_duration))
+    duration = rng.uniform(tw_duration // 2, tw_duration)  # ensure window is at least half of tw_duration
     # duration = max(start, approx_travel_times[min(approx_travel_times, key=approx_travel_times.get)] + 2) # safeguard
     window = (start, start + duration)
 
@@ -126,7 +129,6 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
 
 def setup_routing_sim(server, params_fn: str,
                       halton_nn_tree: BallTree,
-                    
                       estimate_matrix: np.ndarray,
                       num_init_requests: int = 5,
                       new_request_prob: float = 0.75,
@@ -152,7 +154,7 @@ def setup_routing_sim(server, params_fn: str,
         # improve this to get te eactual distance_threshh
         pkg = generate_package_request(name, lat_dist, lon_dist, 0.0, 
                                        time_window_duration, rng, 
-                                       depots=depots, dist_thresh=5 ,
+                                       depots=depots, dist_thresh=5,
                                        csv_logger=csv_logger)
         active_packages[name] = pkg
         package_registry[name] = pkg
@@ -179,6 +181,7 @@ def setup_routing_sim(server, params_fn: str,
         num_active_packages=num_init_requests,
         in_transit_packages=in_transit_packages,
         depots=depots if depots else {},
+        new_packages_created=False
     )
     for drone_nm, props in server.agent_prop_set.items():
         props.available_at = 0.0
@@ -395,6 +398,42 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             sim.active_packages.pop(r, None)
             sim.num_active_packages -= 1
 
+
+
+
+
+        # # 4) Generate new packages probabilistically
+        if rng.random() <= sim.new_request_prob:
+            city = sim.city_params
+            lat_dist = uniform(loc=city.lat_start, scale=city.lat_end - city.lat_start)
+            lon_dist = uniform(loc=city.lon_start, scale=city.lon_end - city.lon_start)
+            pkg_name = f"pkg{len(sim.package_registry) + 1}"
+            new_package = generate_package_request(
+                pkg_name,
+                # Sample uniformly in bounds
+                lat_dist,
+                lon_dist,
+                sim.current_time,
+                sim.time_window_duration,
+                rng, dist_thresh=sim.distance_thresh, depots=sim.depots,
+                csv_logger=csv_logger
+            )
+            sim.num_total_packages += 1
+            sim.num_active_packages += 1
+            new_package_nm = f"pkg{sim.num_total_packages}"
+            logging.info(f"{new_package_nm} added!")
+            sim.active_packages[new_package_nm] = new_package
+            sim.new_packages_created = True
+            sim.package_registry[pkg_name] = new_package 
+            sim.package_registry[pkg_name] = {
+                "obj": new_package,             
+                "claimed_by": [],   
+                "winner": None,         
+                "time_assigned": [],
+            }
+
+
+
         # 5) Grey markers for sites:
         # active packages + (optional) packages with outstanding claims
         for pkg_nm, pp in sim.active_packages.items():
@@ -525,22 +564,23 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             sim.num_active_packages -= 1
 
         # # 4) Generate new packages probabilistically
-        # if rng.random() <= sim.new_request_prob:
-        #     lat_start, lat_end = sim.city_params.lat_start, sim.city_params.lat_end
-        #     lon_start, lon_end = sim.city_params.lon_start, sim.city_params.lon_end
-        #     new_package = generate_package_request(
-        #         # Sample uniformly in bounds
-        #         rng.uniform(lat_start, lat_end),
-        #         rng.uniform(lon_start, lon_end),
-        #         sim.current_time,
-        #         sim.time_window_duration,
-        #         rng
-        #     )
-        #     sim.num_total_packages += 1
-        #     sim.num_active_packages += 1
-        #     new_package_nm = f"pkg{sim.num_total_packages}"
-        #     logging.info(f"{new_package_nm} added!")
-        #     sim.active_packages[new_package_nm] = new_package
+        if rng.random() <= sim.new_request_prob:
+            lat_start, lat_end = sim.city_params.lat_start, sim.city_params.lat_end
+            lon_start, lon_end = sim.city_params.lon_start, sim.city_params.lon_end
+            new_package = generate_package_request(
+                # Sample uniformly in bounds
+                rng.uniform(lat_start, lat_end),
+                rng.uniform(lon_start, lon_end),
+                sim.current_time,
+                sim.time_window_duration,
+                rng
+            )
+            sim.num_total_packages += 1
+            sim.num_active_packages += 1
+            new_package_nm = f"pkg{sim.num_total_packages}"
+            logging.info(f"{new_package_nm} added!")
+            sim.active_packages[new_package_nm] = new_package
+            sim.new_packages_created = True
 
         # 5) Grey markers for sites
         for pkg_nm, pp in sim.active_packages.items():

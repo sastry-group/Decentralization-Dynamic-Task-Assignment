@@ -64,7 +64,7 @@ PARAM_FILES = ROOT / "param_files"
 TRAVELTIME_EST = PARAM_FILES / "scoba_data.npz"
 PARAMS_BY_DEPOTS = {
     2: str(PARAM_FILES / "sf_bb_params_2dpts.toml"),
-    5: str(PARAM_FILES / "sf_bb_params_more_overlap.toml"),
+    5: str(PARAM_FILES / "sf_bb_params.toml"),
     6: str(PARAM_FILES / "sf_bb_params_more_overlap.toml"),
     10: str(PARAM_FILES / "sf_bb_params_10dpts.toml"),
 }
@@ -514,6 +514,7 @@ def main():
    
 
     for trial in range(trials):
+        print(f"Trial {trial+1}/{trials}")
 
         props = {name: DroneProperties(tree=SearchTree(), interaction_events=[])
                     for name in drone_ordering}
@@ -545,6 +546,7 @@ def main():
                 package_dict=sim.active_packages,
                 radius_km=sim.distance_thresh,
                 trial=trial,
+                time_step = 0
             )
         
         timing_per_timestep = [] 
@@ -582,6 +584,16 @@ def main():
                 logging.info("No active packages. Skipping assignment.")
 
             update_routing_sim(trial, sim, server, rng, csv_logger=csv_logger, allow_overlap=allow_overlap)
+            if sim.new_packages_created:
+                plot_initial_map(
+                    city,
+                    depots=depots,
+                    drones=server.agent_set,
+                    package_dict=sim.active_packages,
+                    radius_km=sim.distance_thresh,
+                    trial=trial, time_step=t,
+                )
+                sim.new_packages_created = False
             
 
 

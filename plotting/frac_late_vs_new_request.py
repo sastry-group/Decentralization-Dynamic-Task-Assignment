@@ -7,7 +7,7 @@ import glob
 import pandas as pd
 
 
-base_dir = "results/logs/dr50_dpt5"
+base_dir = "results/logs/dp5_dr15_pkg22_plus"
 output_dir = "results"
 os.makedirs(output_dir, exist_ok=True)
 
@@ -104,7 +104,7 @@ colors = {
 
 hatches = {
     comms_levels[0]: "",
-    comms_levels[1]: "///"
+    # comms_levels[1]: "///"
 }
 
 # bar geometry
@@ -168,7 +168,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(probs)
 ax.set_xlabel("New-request probability")
 ax.set_ylabel("Mean fraction of late packages")
-ax.set_ylim(0, 1)
+ax.set_ylim(0, 0.4)
 
 fig_name = (
     f"late_combined_"
