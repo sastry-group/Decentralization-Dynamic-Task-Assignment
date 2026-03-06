@@ -4,6 +4,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
+import itertools
 import pandas as pd
 
 
@@ -91,21 +92,30 @@ print("Communication levels found:", comms_levels)
 print("Probabilities found:", probs)
 
 
-if len(algorithms) != 2:
-    print("Warning: Script assumes exactly 2 algorithms for clean layout.")
+# if len(algorithms) != 2:
+#     print("Warning: Script assumes exactly 2 algorithms for clean layout.")
 
 # -----------------------------
 # Visual encoding
 # -----------------------------
-colors = {
-    algorithms[0]: "#1f77b4",   # blue
-    algorithms[1]: "#ff7f0e",   # orange
+
+cmap = plt.get_cmap("tab10")
+colors = {algo: cmap(i % 10) for i, algo in enumerate(algorithms)}
+hatch_patterns = ["", "//", "xx", "\\\\", "..", "++"]
+hatches = {
+    comm: hatch_patterns[i % len(hatch_patterns)]
+    for i, comm in enumerate(comms_levels)
 }
 
-hatches = {
-    comms_levels[0]: "",
-    # comms_levels[1]: "///"
-}
+# colors = {
+#     algorithms[0]: "#1f77b4",   # blue
+#     algorithms[1]: "#ff7f0e",   # orange
+# }
+
+# hatches = {
+#     comms_levels[0]: "",
+#     # comms_levels[1]: "///"
+# }
 
 # bar geometry
 n_algos = len(algorithms)

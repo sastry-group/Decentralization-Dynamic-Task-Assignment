@@ -16,17 +16,6 @@ from .routing_types import convert_to_vector, EuclideanLatLongMetric
 from solver.scoba_types import InteractionEvent, MODE
 from plotting.map_sim_setup import plot_initial_map
 
-# TRAVEL = dict(
-#     avg_speed_km_per_min = 0.00777 * 60 / 1.2, # ~0.4662 km/min , just a scale factor to icnrease travel times
-#     cv = 0.33,           # stdev = cv * mean   (tune 0.2–0.4 to taste)
-#     dist = "epanechnikov"  # "epanechnikov" or "normal"
-# )
-
-# def travel_time_mean_minutes(loc1: LatLonCoords, loc2: LatLonCoords) -> float:
-#     v1, v2 = convert_to_vector(loc1), convert_to_vector(loc2)
-#     dist_km = EuclideanLatLongMetric().evaluate(v1, v2)
-#     mu = dist_km / TRAVEL["avg_speed_km_per_min"]
-#     return max(math.ceil(mu), 3)  # keep your floor of 3 min
 
 
 
@@ -36,24 +25,39 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
                              depots: dict[str,List[LatLonCoords]],
                              dist_thresh: float,
                              csv_logger=None) -> Package:
+    MIN_DIST = 1.0  # km (~300 m)
+
+    # while True:
     lat = lat_dist.rvs(random_state=rng)
     lon = lon_dist.rvs(random_state=rng)
     delivery = LatLonCoords(lat=lat, lon=lon)
 
-    approx_travel_times = {}
     distance_dict = {}
+
     for depot_idx, depot in depots.items():
-        mu_tt = travel_time_mean_minutes(depot.location, delivery)  # unified deterministic mean
-        approx_travel_times[depot_idx] = mu_tt
         dist_km = EuclideanLatLongMetric().evaluate(depot.location, delivery)
-        distance_dict[depot_idx] =  dist_km
+        distance_dict[depot_idx] = dist_km
+
+    # min_dist = min(distance_dict.values())
+
+        # accept if within desired ring around depots
+        # if MIN_DIST <= min_dist <= dist_thresh:
+        # if MIN_DIST <= min_dist:
+        #     break
+
+    approx_travel_times = {}
+
+    for depot_idx, depot in depots.items():
+        # print("Calling from generate_package_request with depot", depot_idx, "and delivery", delivery)
+        mu_tt = travel_time_mean_minutes(depot.location, delivery)
+        approx_travel_times[depot_idx] = mu_tt
 
     # Pick window length relative to nearest depot mean
-    mu_nearest = min(approx_travel_times.values())
-    k_low, k_high = 0.8, 1.4
+    # mu_nearest = min(approx_travel_times.values())
+    # k_low, k_high = 0.8, 1.4
     # duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
-    duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
-    start = round(current_time + rng.uniform(tw_duration // 2, tw_duration))
+    # duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
+    start = current_time + rng.uniform(tw_duration // 2, tw_duration)
     duration = rng.uniform(tw_duration // 2, tw_duration)  # ensure window is at least half of tw_duration
     # duration = max(start, approx_travel_times[min(approx_travel_times, key=approx_travel_times.get)] + 2) # safeguard
     window = (start, start + duration)
@@ -77,53 +81,6 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
         })
 
     return pkg
-
-
-
-# def sample_true_travel_time(mu: float, rng: np.random.Generator) -> float:
-#     sigma = max(TRAVEL["cv"] * mu, 1e-6)
-#     if TRAVEL["dist"] == "epanechnikov":
-#         # u ~ Epanechnikov with Var(u)=1 using the sqrt(5) trick; std = sigma
-#         sqrt5 = 5 ** 0.5
-#         while True:
-#             u = rng.uniform(-sqrt5, sqrt5)
-#             if rng.uniform() <= 0.75 * (1 - (u / sqrt5) ** 2):
-#                 return max(1.0, round(mu + u * sigma))
-#     elif TRAVEL["dist"] == "normal":
-#         return max(1.0, round(rng.normal(mu, sigma)))
-#     else:
-#         raise ValueError("Unknown TRAVEL['dist']")
-
-
-
-
-# def sample_true_delivery_return_time(
-#     depot_loc: LatLonCoords,
-#     delivery_loc: LatLonCoords,
-#     window: Tuple[float, float],
-#     current_time: float,
-#     rng: np.random.Generator
-# ) -> Tuple[float, float]:
-#     """
-#     Sample true delivery time (arrive at customer) and true return time (back to depot),
-#     using the same uncertainty model as everywhere else.
-#     """
-#     mu_out = travel_time_mean_minutes(depot_loc, delivery_loc)
-#     mu_back = travel_time_mean_minutes(delivery_loc, depot_loc)
-
-#     # sample both legs with the same distribution family & CV
-#     tt_out = sample_true_travel_time(mu_out, rng)
-#     tt_back = sample_true_travel_time(mu_back, rng)
-
-#     # depart immediately; arrive at
-#     td = round(current_time + tt_out)
-#     # respect time window start: wait if early
-#     td = max(td, window[0])
-
-#     # return after (waiting does not reduce flight time)
-#     rt = round(td + tt_back)
-
-#     return td, rt
 
 
 
@@ -157,7 +114,6 @@ def setup_routing_sim(server, params_fn: str,
                                        depots=depots, dist_thresh=5,
                                        csv_logger=csv_logger)
         active_packages[name] = pkg
-        package_registry[name] = pkg
         package_registry[name] = {
             "obj": pkg,             
             "claimed_by": [],   
@@ -403,7 +359,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
 
 
         # # 4) Generate new packages probabilistically
-        if rng.random() <= sim.new_request_prob:
+        if rng.random() <= sim.new_request_prob and sim.current_time < 60:  
             city = sim.city_params
             lat_dist = uniform(loc=city.lat_start, scale=city.lat_end - city.lat_start)
             lon_dist = uniform(loc=city.lon_start, scale=city.lon_end - city.lon_start)
@@ -424,7 +380,6 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             logging.info(f"{new_package_nm} added!")
             sim.active_packages[new_package_nm] = new_package
             sim.new_packages_created = True
-            sim.package_registry[pkg_name] = new_package 
             sim.package_registry[pkg_name] = {
                 "obj": new_package,             
                 "claimed_by": [],   
@@ -564,23 +519,23 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             sim.num_active_packages -= 1
 
         # # 4) Generate new packages probabilistically
-        if rng.random() <= sim.new_request_prob:
-            lat_start, lat_end = sim.city_params.lat_start, sim.city_params.lat_end
-            lon_start, lon_end = sim.city_params.lon_start, sim.city_params.lon_end
-            new_package = generate_package_request(
-                # Sample uniformly in bounds
-                rng.uniform(lat_start, lat_end),
-                rng.uniform(lon_start, lon_end),
-                sim.current_time,
-                sim.time_window_duration,
-                rng
-            )
-            sim.num_total_packages += 1
-            sim.num_active_packages += 1
-            new_package_nm = f"pkg{sim.num_total_packages}"
-            logging.info(f"{new_package_nm} added!")
-            sim.active_packages[new_package_nm] = new_package
-            sim.new_packages_created = True
+        # if rng.random() <= sim.new_request_prob:
+        #     lat_start, lat_end = sim.city_params.lat_start, sim.city_params.lat_end
+        #     lon_start, lon_end = sim.city_params.lon_start, sim.city_params.lon_end
+        #     new_package = generate_package_request(
+        #         # Sample uniformly in bounds
+        #         rng.uniform(lat_start, lat_end),
+        #         rng.uniform(lon_start, lon_end),
+        #         sim.current_time,
+        #         sim.time_window_duration,
+        #         rng
+        #     )
+        #     sim.num_total_packages += 1
+        #     sim.num_active_packages += 1
+        #     new_package_nm = f"pkg{sim.num_total_packages}"
+        #     logging.info(f"{new_package_nm} added!")
+        #     sim.active_packages[new_package_nm] = new_package
+        #     sim.new_packages_created = True
 
         # 5) Grey markers for sites
         for pkg_nm, pp in sim.active_packages.items():

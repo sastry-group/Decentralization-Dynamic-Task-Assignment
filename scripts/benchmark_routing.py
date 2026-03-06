@@ -56,7 +56,7 @@ from domains.routing.routing_scoba import scoba_routing
 from domains.routing.routing_ibr import iterative_best_response
 from solver.scoba_types                 import GenericAllocation as RoutingAllocation
 from solver.scoba_types import SearchTree
-
+from domains.routing.travel_model import initialize_travel_model
 
 
 # Constants and file paths
@@ -397,7 +397,7 @@ def main():
             )
         params_fn = PARAMS_BY_DEPOTS[args["n_depots"]]
     
-    rng = RandomState(args["seed"])
+    rng = np.random.default_rng(args["seed"])
     comms_dict = comms_graph_from_mode(args["comms_mode"], args["n_depots"])
 
     trials = args['trials']
@@ -445,10 +445,25 @@ def main():
     arrs = np.load(str(TRAVELTIME_EST))
     points = arrs["points"]
     estimates = arrs["estimates"]
-    # scoba_halton_tree = BallTree(points, metric="euclidean")
-    points_rad = np.deg2rad(points)
-    scoba_halton_tree = BallTree(points_rad, metric="haversine")
+
+    INVALID = 100000
+
+    valid_nodes = np.all(estimates < INVALID, axis=1)
+
+    print("Original Halton nodes:", len(points))
+    print("Valid Halton nodes:", np.sum(valid_nodes))
+
+    # filter points and matrix
+    points = points[valid_nodes]
+    estimates = estimates[valid_nodes][:, valid_nodes]
+
+    # rebuild tree with filtered nodes
+    scoba_halton_tree = BallTree(points, metric="euclidean")
+
     travel_time_estimates = estimates
+    initialize_travel_model(scoba_halton_tree, travel_time_estimates, time_scale=60.0)
+
+
 
 
     # # Load travel-time estimates
@@ -522,7 +537,10 @@ def main():
                                     agent_prop_set=props,
                                     agent_ordering=drone_ordering,
                                     max_tasks_to_consider=20,
-                                    conflict_threshold=20)
+                                    conflict_threshold=10)
+
+
+
         sim = setup_routing_sim(
             server,
             params_fn,
@@ -584,7 +602,7 @@ def main():
                 logging.info("No active packages. Skipping assignment.")
 
             update_routing_sim(trial, sim, server, rng, csv_logger=csv_logger, allow_overlap=allow_overlap)
-            if sim.new_packages_created:
+            if sim.new_packages_created and args["plot_init"]:
                 plot_initial_map(
                     city,
                     depots=depots,

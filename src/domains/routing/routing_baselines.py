@@ -8,7 +8,8 @@ from typing import Dict, List, Tuple, Any, Set
 # Allocation and simulator types
 from solver.scoba_types import MODE, GenericAllocation as RoutingAllocation
 from .routing_types import RoutingSimulator, EuclideanLatLongMetric, convert_to_vector
-from .routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes
+# from .routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes
+from .travel_model import  sample_true_delivery_return_time, travel_time_mean_minutes
 from domains.routing.mcts import RoutingMCTSMDP
 import logging
 
@@ -90,7 +91,7 @@ def expected_hungarian(server: RoutingAllocation, routing_sim: RoutingSimulator,
 
 
 def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, rng: Any = None,
-                      csv_logger=None, trial_id=None, time_step=None, comms_dict=None, allow_overlap=False) -> None:
+                      csv_logger=None, trial_id=None, time_step=None, comms_dict=None, allow_overlap=False, depot_order="asc") -> None:
     """
     Assign drones to earliest due packages within range.
     """
@@ -113,7 +114,20 @@ def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, 
 
 
     # Finding nearby packages
-    for depot_number, depot_drones in available_drones.items():
+    if depot_order == "random":
+        depot_numbers = list(available_drones.keys())
+        rng.shuffle(depot_numbers)
+        order = ((d, available_drones[d]) for d in depot_numbers)
+
+    elif depot_order == "desc":
+        depot_numbers = sorted(available_drones.keys(), reverse=True)
+        order = ((d, available_drones[d]) for d in depot_numbers)
+
+    else:
+        order= available_drones.items()
+
+    for depot_number, depot_drones in order:
+    # for depot_number, depot_drones in available_drones.items():
 
         # all the drones in this depot share the same depot location
         depot_loc = server.agent_set[depot_drones[0]].depot_loc
@@ -146,10 +160,21 @@ def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, 
                 if pkg_nm not in routing_sim.busy_packages:
                     all_assigned_pkgs.add(pkg_nm)
 
-                    server.agent_task_allocation[drone_id] = (pkg_nm, float('inf'))  # inf for now for true delivery, can be updated later
+                    # server.agent_task_allocation[drone_id] = (pkg_nm, float('inf'))  # inf for now for true delivery, can be updated later
                     # get the actual delivery time and return time
                     window = routing_sim.active_packages[pkg_nm].time_window
                     delivery_location = routing_sim.active_packages[pkg_nm].delivery
+
+
+                    server.agent_prop_set[drone_id].current_package = pkg_nm
+                    server.agent_task_allocation[drone_id] = (pkg_nm, float("inf"))
+                    if allow_overlap:
+                        routing_sim.package_claims.setdefault(pkg_nm, set()).add(drone_id)
+                        routing_sim.package_registry[pkg_nm]["claimed_by"].append(drone_id)
+                        routing_sim.package_registry[pkg_nm]["time_assigned"].append(time_step)
+                        routing_sim.package_registry[pkg_nm]["winner"] = drone_id
+                        routing_sim.package_winners[pkg_nm] = drone_id
+
                     td, rt = sample_true_delivery_return_time(
                         depot_loc,
                         delivery_location,
@@ -160,8 +185,15 @@ def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, 
                     # Update sim state
                     routing_sim.true_delivery_return[(drone_id, pkg_nm)] = (td, rt)
                     server.agent_prop_set[drone_id].at_depot = False
-                    routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages.pop(pkg_nm)
-                    routing_sim.num_active_packages -= 1
+                    # routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages.pop(pkg_nm)
+                    # routing_sim.num_active_packages -= 1
+
+
+                    if allow_overlap:
+                        routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages[pkg_nm]
+                    else:
+                        routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages.pop(pkg_nm)
+                        routing_sim.num_active_packages -= 1
                 
                 
                     if csv_logger:
@@ -180,7 +212,7 @@ def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, 
                         })
 
                     logging.info(f"[Depot {depot_number}] Drone {drone_id} assigned package {pkg_nm}, package delivery time {td}, return time {rt}, package window (start, end, nominal) {server.agent_task_windows[(drone_id, pkg_nm)]}")
-                    # break  # Only assign one package per drone
+
         
 
 
