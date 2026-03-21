@@ -122,9 +122,20 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
         temp_tree.child_ids.clear()
         temp_tree.parent_id.clear()
         return
-    
+
 
     tree = server.agent_prop_set[agent_name].tree
+    tree.nodes.clear()
+    tree.child_ids.clear()
+    tree.parent_id.clear()
+
+    # recreate root node (Julia always starts from root)
+    tree.nodes.append(
+        DecisionNode(agent_name="", task_name="", attempt=False,
+                    timeval=0.0, util=0.0, idx=0, utilset=True)
+    )
+    tree.parent_id[0] = 0
+    tree.child_ids[0] = []
     interaction_events = server.agent_prop_set[agent_name].interaction_events
 
     outcome_leaf_idxs = set()
@@ -142,6 +153,7 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
     
     # Optional: be explicit about ordering by START (safe)
     considered_ie = sorted(considered_ie[:num_to_consider], key=lambda ie: ie.timestamps[MODE.START])
+    # considered_ie = considered_ie[:num_to_consider]
 
     for ie in considered_ie:
         ie_stamp = ie.timestamps[MODE.START]

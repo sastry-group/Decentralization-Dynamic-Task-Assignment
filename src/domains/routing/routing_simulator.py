@@ -359,7 +359,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
 
 
         # # 4) Generate new packages probabilistically
-        if rng.random() <= sim.new_request_prob and sim.current_time < 60:  
+        if rng.random() <= sim.new_request_prob and sim.current_time < 100:  
             city = sim.city_params
             lat_dist = uniform(loc=city.lat_start, scale=city.lat_end - city.lat_start)
             lon_dist = uniform(loc=city.lon_start, scale=city.lon_end - city.lon_start)

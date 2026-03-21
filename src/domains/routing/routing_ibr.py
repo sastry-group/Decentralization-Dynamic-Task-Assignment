@@ -10,7 +10,7 @@ from solver.scoba_types import InteractionEvent, MODE, GenericAllocation as Rout
 from domains.routing.routing_types import RoutingSimulator, EuclideanLatLongMetric, convert_to_vector
 from domains.routing.routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes
 from domains.graph_builder import build_comm_structure
-from .travel_model import delivery_success_prob
+from .travel_model import delivery_success_prob_ibr
 
 
 
@@ -308,7 +308,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     p_cache = {}  
     for dn, events in interaction_events_by_drone.items():
         for ie in events:
-            p_cache[(dn, ie.task_name)] = delivery_success_prob(
+            p_cache[(dn, ie.task_name)] = delivery_success_prob_ibr(
                 ref_time=routing_sim.current_time,
                 ie=ie,
                 std_scale=routing_sim.tt_est_std_scale,

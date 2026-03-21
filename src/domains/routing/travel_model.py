@@ -104,11 +104,28 @@ def cdf_travel_time(t_available: float, mu: float) -> float:
         raise ValueError(f"Unknown TRAVEL['dist']: {TRAVEL['dist']}")
     
 def delivery_success_prob(ref_time: float, ie: InteractionEvent, std_scale: float) -> float:
+    # mu = ie.travel_time
+    # sigma = mu / std_scale
+    # x = ie.timestamps[MODE.FINISH] - ref_time
+    # return epanechnikov_cdf(x, mu, sigma)
+    mu = ie.timestamps[MODE.RETURN] - ie.timestamps[MODE.FINISH]
+    sigma = mu / std_scale
+
+    x = ie.timestamps[MODE.FINISH]
+
+    return epanechnikov_cdf(x, mu, sigma)
+
+def delivery_success_prob_ibr(ref_time: float, ie: InteractionEvent, std_scale: float) -> float:
     mu = ie.travel_time
     sigma = mu / std_scale
     x = ie.timestamps[MODE.FINISH] - ref_time
     return epanechnikov_cdf(x, mu, sigma)
+    # mu = ie.timestamps[MODE.RETURN] - ie.timestamps[MODE.FINISH]
+    # sigma = mu / std_scale
 
+    # x = ie.timestamps[MODE.FINISH]
+
+    # return epanechnikov_cdf(x, mu, sigma)
 
 def sample_true_travel_time(mu: float, rng: np.random.Generator) -> float:
     # sigma = max(TRAVEL["cv"] * mu, 1e-6)
