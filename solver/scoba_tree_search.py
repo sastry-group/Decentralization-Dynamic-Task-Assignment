@@ -32,7 +32,7 @@ def insert_decision_node(tree: SearchTree, agent_name: str, ie: InteractionEvent
     
 
     # 1) True reference time is clamped to the event START
-    START, FINISH, RETURN = MODE.START, MODE.FINISH, MODE.RETURN
+    START, FINISH, SUCCESS = MODE.START, MODE.FINISH, MODE.SUCCESS
     true_ref_time = max(ref_time, ie.timestamps[MODE.START])
     assert true_ref_time <= ie.timestamps[MODE.FINISH], f"ref_time={ref_time} exceeds FINISH; ie={ie.timestamps}"
 
@@ -90,8 +90,8 @@ def insert_decision_node(tree: SearchTree, agent_name: str, ie: InteractionEvent
     succ_idx = _append(OutcomeNode(
         agent_name=agent_name,
         task_name=ie.task_name,
-        outcome=RETURN,  # success realized at RETURN
-        timeval=ie.timestamps[RETURN],
+        outcome=SUCCESS,
+        timeval=ie.timestamps[SUCCESS],
         probability=success_prob,
         util=utilval,    # immediate reward for success
         idx=None,
@@ -146,7 +146,7 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
     # Filter to packages in tasks_to_consider; keep original order or sort by START
     considered_ie = [ie for ie in interaction_events if ie.task_name in tasks_to_consider]
     num_to_consider = min(len(considered_ie), server.max_tasks_to_consider)
-    logging.info(f"[SCoBA] Agent {agent_name} considering {num_to_consider} tasks out of {len(considered_ie)}")
+    # logging.info(f"[SCoBA] Agent {agent_name} considering {num_to_consider} tasks out of {len(considered_ie)}")
     if num_to_consider == 0:
         tree.clear()
         return
@@ -271,7 +271,7 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
                 # node is a DecisionNode
                 # If parent is outcome SUCCESS, add +1 then take best; else just take best
                 tmp_util = node.util
-                if type(par_node).__name__ == "OutcomeNode" and par_node.outcome == MODE.RETURN:
+                if type(par_node).__name__ == "OutcomeNode" and par_node.outcome == MODE.SUCCESS:
                     tmp_util = 1.0 + node.util
                 par_node.util = max(tmp_util, getattr(par_node, "util", float("-inf")))
 

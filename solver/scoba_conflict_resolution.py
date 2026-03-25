@@ -54,6 +54,7 @@ class SCoBAAlgorithm:
             # constraints={k: set() for k in initial_considered_tasks.keys()}
         )
         self.heap.clear()
+        self.num_total_conflicts = 0
         heapq.heappush(self.heap, (-start.util, start.id, start))
         next_id = 1
 

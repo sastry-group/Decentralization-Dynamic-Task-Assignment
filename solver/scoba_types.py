@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Any
 class MODE(IntEnum):
     START   = 1
     FINISH  = 2
-    RETURN  = 3
+    SUCCESS = 3
 
 @dataclass
 class InteractionEvent:

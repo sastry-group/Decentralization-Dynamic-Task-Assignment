@@ -108,7 +108,7 @@ def delivery_success_prob(ref_time: float, ie: InteractionEvent, std_scale: floa
     # sigma = mu / std_scale
     # x = ie.timestamps[MODE.FINISH] - ref_time
     # return epanechnikov_cdf(x, mu, sigma)
-    mu = ie.timestamps[MODE.RETURN] - ie.timestamps[MODE.FINISH]
+    mu = ie.timestamps[MODE.SUCCESS] - ie.timestamps[MODE.FINISH]
     sigma = mu / std_scale
 
     x = ie.timestamps[MODE.FINISH]

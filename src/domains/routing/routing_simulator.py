@@ -359,33 +359,33 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
 
 
         # # 4) Generate new packages probabilistically
-        if rng.random() <= sim.new_request_prob and sim.current_time < 100:  
-            city = sim.city_params
-            lat_dist = uniform(loc=city.lat_start, scale=city.lat_end - city.lat_start)
-            lon_dist = uniform(loc=city.lon_start, scale=city.lon_end - city.lon_start)
-            pkg_name = f"pkg{len(sim.package_registry) + 1}"
-            new_package = generate_package_request(
-                pkg_name,
-                # Sample uniformly in bounds
-                lat_dist,
-                lon_dist,
-                sim.current_time,
-                sim.time_window_duration,
-                rng, dist_thresh=sim.distance_thresh, depots=sim.depots,
-                csv_logger=csv_logger
-            )
-            sim.num_total_packages += 1
-            sim.num_active_packages += 1
-            new_package_nm = f"pkg{sim.num_total_packages}"
-            logging.info(f"{new_package_nm} added!")
-            sim.active_packages[new_package_nm] = new_package
-            sim.new_packages_created = True
-            sim.package_registry[pkg_name] = {
-                "obj": new_package,             
-                "claimed_by": [],   
-                "winner": None,         
-                "time_assigned": [],
-            }
+        # if rng.random() <= sim.new_request_prob and sim.current_time < 100:  
+        #     city = sim.city_params
+        #     lat_dist = uniform(loc=city.lat_start, scale=city.lat_end - city.lat_start)
+        #     lon_dist = uniform(loc=city.lon_start, scale=city.lon_end - city.lon_start)
+        #     pkg_name = f"pkg{len(sim.package_registry) + 1}"
+        #     new_package = generate_package_request(
+        #         pkg_name,
+        #         # Sample uniformly in bounds
+        #         lat_dist,
+        #         lon_dist,
+        #         sim.current_time,
+        #         sim.time_window_duration,
+        #         rng, dist_thresh=sim.distance_thresh, depots=sim.depots,
+        #         csv_logger=csv_logger
+        #     )
+        #     sim.num_total_packages += 1
+        #     sim.num_active_packages += 1
+        #     new_package_nm = f"pkg{sim.num_total_packages}"
+        #     logging.info(f"{new_package_nm} added!")
+        #     sim.active_packages[new_package_nm] = new_package
+        #     sim.new_packages_created = True
+        #     sim.package_registry[pkg_name] = {
+        #         "obj": new_package,             
+        #         "claimed_by": [],   
+        #         "winner": None,         
+        #         "time_assigned": [],
+        #     }
 
 
 
@@ -582,7 +582,7 @@ def update_time_windows(sim, server, csv_logger=None) -> None:
                 ie_timestamps = {
                     MODE.START:  start_t,
                     MODE.FINISH: finish_t,
-                    MODE.RETURN: return2depot_t,
+                    MODE.SUCCESS: return2depot_t,
                 }
 
                 # Record event + server-side window triple

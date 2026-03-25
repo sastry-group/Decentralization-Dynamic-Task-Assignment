@@ -4,14 +4,10 @@ import argparse
 import json
 import logging
 import sys
-import os
 from pathlib import Path
 import numpy as np
 from sklearn.neighbors import BallTree
-from numpy.random import MT19937, RandomState
 # from pomdp_py.algorithms.po_uct import POUCT
-from scipy.stats import uniform
-import logging
 import time
 
 from csv_logger import CSVLogger
@@ -21,11 +17,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))            
 sys.path.insert(0, str(ROOT / 'src'))  
 
-from numpy.random import default_rng
+
 
 # TOML parsing
-import sys as _sys
-if _sys.version_info >= (3, 11):
+
+if sys.version_info >= (3, 11):
     import tomllib as _toml
 else:
     import toml as _toml
@@ -148,25 +144,21 @@ def build_drones(n_drones: int, depots: dict[int, Depot]):
 
     return drone_ordering, drone_set
 
-def comms_graph_from_mode(mode: str, n_depots: int, custom_path=None):
+def comms_graph_from_mode(mode: str, n_depots: int):
     """
     Returns comms_dict: depot -> list[neighbor_depot]
 
-    mode examples:
-      - "2_full"
-      - "2_none"
-      - "3_full"
-      - "5_full"
-      - "5_edge_rm_12_T2"
-      - "5_edge_rm_12_31_T3"
-      - "5_edge_rm_12_31_43_T4"
-      - "5_ring"
-      - "5_none"
+    Generic modes (any n_depots): "full", "none"
+    Depot-specific modes: "5_full", "5_ring", "5_none", "5_edge_rm_12_T2", etc.
     """
     depots = list(range(1, n_depots + 1))
     valid = set(depots)
 
-    # ------------------ HARD-CODED EXAMPLES ------------------
+    if mode == "full":
+        return {d: [x for x in depots if x != d] for d in depots}
+    if mode == "none":
+        return {d: [] for d in depots}
+
     EXAMPLES = {
         # ----- 2 depots -----
         "2_full": {
@@ -372,9 +364,6 @@ def parse_commandline():
                 choices=["asc", "desc", "random"])
     p.add_argument("--plot-comms", action="store_true")
     p.add_argument("--plot-init", action="store_true")
-    p.add_argument("--no-plots", action="store_true",
-                   help="Disable all plotting regardless of other plot flags.")
-
     # logging verbosity
     p.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING"], default="INFO")
 
@@ -414,15 +403,19 @@ def main():
     if num_init is None:
         num_init = int(round(1.5 * args["n_drones"]))
 
+    overlap = "overlap" if args["allow_overlap"] else "nooverlap"
+
     log_dir = (
         f"dr{args['n_drones']}_dep{args['n_depots']}_pkgnum{num_init}"
         f"_ntrials{trials}"
+        f"_nsteps{args['timesteps']}"
         f"_probpt{str(args['new_request_prob']).replace('.', '')}"
         f"_win{args['time_window']}"
         f"_{args['baseline']}"
         f"_comms-{comms_tag}"
         f"_init-{init_tag}"
         f"_dporder-{order_tag}"
+        f"_overlap-{overlap}"
     )
     out_dir = ROOT / "results" / "logs" / log_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -466,40 +459,11 @@ def main():
 
 
 
-    # # Load travel-time estimates
-    # arrs = np.load(str(ROOT / "param_files" / "scoba_data.npz"))
-    # points    = arrs["points"]       # shape (n_points, 2)
-    # estimates = arrs["estimates"]    # shape (n_points, n_points)
-    # scoba_halton_tree = BallTree(points, metric="euclidean")
-    # travel_time_estimates = estimates
-
     # world
     depots = build_depots(args["n_depots"])
     drone_ordering, drone_set = build_drones(args["n_drones"], depots)
 
     allow_overlap = bool(args["allow_overlap"])
-
-
-
-    # Build drones
-    n_drones = args['n_drones']
-    n_depots = args['n_depots']
-    drone_ordering = []
-    drone_set = {}
-    idx = 1
-    n_per_depot = n_drones // n_depots
-    remainder = n_drones % n_depots # incase odd number of drones
-    for depot_idx, depot in depots.items():
-        # Give one extra drone to the first `remainder` depots
-        n_this_depot = n_per_depot + (1 if depot_idx <= remainder else 0)
-        for _ in range(n_this_depot):
-            name = f'dn{idx}'; idx += 1
-            drone_ordering.append(name)
-            drone_set[name] = Drone(
-                drone_id=name,
-                depot_number=depot_idx,
-                depot_loc=depot.location,
-            )
 
     if args["plot_comms"]:
         plot_comms_graph(comms_dict, depots=depots, log_dir=log_dir)
@@ -536,8 +500,8 @@ def main():
         server = RoutingAllocation(agent_set=drone_set,
                                     agent_prop_set=props,
                                     agent_ordering=drone_ordering,
-                                    max_tasks_to_consider=20,
-                                    conflict_threshold=10)
+                                    max_tasks_to_consider=10000,
+                                    conflict_threshold=100)
 
 
 
@@ -632,7 +596,7 @@ def main():
     results['delivered'] = delivered_pkgs
     results['total'] = total_pkgs
 
-    with open(f"results/logs/{log_dir}/{log_dir}.json", 'w') as outf:
+    with open(out_dir / f"{log_dir}.json", 'w') as outf:
         json.dump(results, outf, indent=2)
 
     csv_logger.close()
