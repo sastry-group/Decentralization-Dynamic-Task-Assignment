@@ -282,7 +282,9 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
                 tmp_util = node.util
                 if type(par_node).__name__ == "OutcomeNode" and par_node.outcome == MODE.SUCCESS:
                     tmp_util = 1.0 + node.util
-                par_node.util = max(tmp_util, getattr(par_node, "util", float("-inf")))
+                # par_node.util = max(tmp_util, getattr(par_node, "util", float("-inf")))
+                par_node.util = max(tmp_util, par_node.util)
+
 
             to_add.add(par_id)
             to_rm.add(rfi)
@@ -324,18 +326,18 @@ def get_next_attempt_idx(tree: 'SearchTree') -> int:
         def is_attempt(node): return hasattr(node, "attempt") and node.attempt is True
         def is_dec(node):     return hasattr(node, "attempt")
 
-        if is_dec(n0) and is_dec(n1):
-            attempt_idx  = c0 if is_attempt(n0) else c1
-            no_attempt_idx = c1 if attempt_idx == c0 else c0
+        # if is_dec(n0) and is_dec(n1):
+        attempt_idx  = c0 if is_attempt(n0) else c1
+        no_attempt_idx = c1 if attempt_idx == c0 else c0
 
-            # If skipping yields higher util, keep going down that branch; else choose attempt here
-            if tree.nodes[no_attempt_idx].util > tree.nodes[attempt_idx].util:
-                dec_fringe.append(no_attempt_idx)
-            else:
-                subtree_root_dec = attempt_idx
-                # don’t descend further from here (mirrors Julia logic)
+        # If skipping yields higher util, keep going down that branch; else choose attempt here
+        if tree.nodes[no_attempt_idx].util > tree.nodes[attempt_idx].util:
+            dec_fringe.append(no_attempt_idx)
         else:
-            # Children aren’t both decisions (likely outcomes) → nothing to do here
-            continue
+            subtree_root_dec = attempt_idx
+                # don’t descend further from here (mirrors Julia logic)
+        # else:
+        #     # Children aren’t both decisions (likely outcomes) → nothing to do here
+        #     continue
 
     return subtree_root_dec

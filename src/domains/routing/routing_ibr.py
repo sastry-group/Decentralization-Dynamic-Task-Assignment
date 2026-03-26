@@ -29,17 +29,6 @@ def create_comm_graph(depots: Dict[int, List[str]]) -> Dict[str, List[str]]:
 
 
 
-# def delivery_util(reward: float, ref_time: float, ie: InteractionEvent) -> float:
-
-    
-#     # Compute a realistic utility as expected reward
-#     p_succ = delivery_success_prob(std_scale=2.0, 
-#                                    ref_time=ref_time,
-#                                    ie=ie)
-    
-#     return reward * p_succ
-
-
 def group_welfare(assignments, group, p_cache, reward):
     # assignments: dict drone->pkg (pkg can be None)
     # group: iterable of drones to include
@@ -54,27 +43,8 @@ def group_welfare(assignments, group, p_cache, reward):
             best_by_pkg[pkg] = p
     return reward * sum(best_by_pkg.values())
 
-#     return u, len(competitors)
 
 
-# def expected_group_utility(pkg, agent, assigned_visible, p_cache,
-#                     delivery_reward=1000.0):
-
-#     p_i = p_cache.get((agent, pkg), 0.0)
-
-#     competitors = [
-#         n for n, p in assigned_visible.items()
-#         if p == pkg and n != agent
-#     ]
-
-#     p_sum = p_i + sum(p_cache.get((n, pkg), 0.0) for n in competitors)
-
-#     if p_sum <= 0:
-#         return 0.0, len(competitors)
-
-#     u = delivery_reward * (p_i ** 2 / p_sum)
-
-#     return u, len(competitors)
 def group_welfare(assignments, group, p_cache, reward):
     best_by_pkg = {}
     for dn in group:
@@ -102,33 +72,6 @@ def compute_utility(pkg, agent, assigned, group, p_cache, reward):
     # print(f"Utility if idle: {w0:.2f}, Utility if take pkg: {w1:.2f}")
 
     return w1 - w0
-
-# def delivery_success_prob(std_scale: float, ref_time: float, ie: InteractionEvent) -> float:
-#     travel_time = ie.travel_time # some estimate  trvel time
-#     mean = travel_time
-#     scale = travel_time / std_scale
-#     x = ie.timestamps[MODE.FINISH] - ref_time  # this is counting what the current time step is 
-
-#     prob = epanechnikov_cdf(x, mean, scale)
-#     return prob
-
-
-# def epanechnikov_cdf(x: float, mean: float, scale: float) -> float:
-#     """
-#     Compute the Epanechnikov CDF at x, with given mean and scale.
-#     Support is [mean - sqrt(5)*scale, mean + sqrt(5)*scale].
-#     """
-#     sqrt5 = 5 ** 0.5
-#     a = mean - sqrt5 * scale
-#     b = mean + sqrt5 * scale
-
-#     if x <= a:
-#         return 0.0
-#     elif x >= b:
-#         return 1.0
-#     else:
-#         z = (x - mean) / scale
-#         return 0.75 * (z / sqrt5 - (z ** 3) / (3 * sqrt5 ** 3)) + 0.5
 
 
 
@@ -256,10 +199,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
             f"[IBR] depot {d} previously-visible pkgs: {sorted(previously_pkgs_visible_to_depot[d])}"
         )
 
-    # # Helper: get visible drones for a given agent - REMOVE
-    # def get_visible_drones_for_agent(agent_id: str) -> List[str]:
-    #     dnum = server.agent_set[agent_id].depot_number
-    #     return visible_drones_by_depot.get(dnum, [])
+
 
     # --- Precompute interaction events in range per depot ---
     interaction_events_by_drone: Dict[str, List[InteractionEvent]] = {}
@@ -414,7 +354,12 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
 
             for ie in interaction_events_by_drone.get(drone, []):
                 pkg = ie.task_name
-
+                if allow_overlap:
+                    if pkg in prev_blocked:  # only block cross-timestep committed pkgs
+                        continue
+                else:
+                    if pkg in blocked_pkgs:  # block busy + neighbor assignments + prev_blocked
+                        continue
                 # enforce blocking if desired
                 # if pkg in blocked_pkgs:
                 #     continue
@@ -468,10 +413,15 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
     logging.info("[IBR] Final assignments are: " + str(assigned))
 
     for dn, pkg in assigned.items():
-        
+        if pkg is None:
+            continue    
         if allow_overlap is False:
             if pkg in routing_sim.busy_packages:
                 logging.warning(f"Drone {dn} lost allocation for {pkg} (already taken)")
+                continue
+
+            if pkg not in routing_sim.active_packages:   # ← add this
+                logging.warning(f"Drone {dn} lost allocation for {pkg} (already popped)")
                 continue
             else:
                 server.agent_task_allocation[dn] = (pkg, float('inf'))

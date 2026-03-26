@@ -180,6 +180,7 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
     # 4. Build tentative allocations PER COMPONENT, not per global depot loop
     # ------------------------------------------------------------------
     scoba_alg = SCoBAAlgorithm(allocation=server, routing_sim=routing_sim)
+    globally_assigned: Set[str] = set() 
 
     for component in components:
         component_depots = sorted(component)
@@ -220,7 +221,11 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                 ) <= routing_sim.distance_thresh
             }
 
-            pkgs_available = pkgs_in_range - previously_visible.get(depot_number, set())
+            if allow_overlap:
+                pkgs_available = pkgs_in_range - previously_visible.get(depot_number, set()) - globally_assigned  
+            else:
+                pkgs_available = pkgs_in_range - set(routing_sim.busy_packages.keys()) - globally_assigned 
+
             depot_assigned_pkgs: Set[str] = set()
 
             for drone_nm in depot_drones:
@@ -301,9 +306,12 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                 continue
             if pkg_nm not in routing_sim.active_packages:
                 continue
-            if (not allow_overlap) and (pkg_nm in routing_sim.busy_packages):
+            # if (not allow_overlap) and (pkg_nm in routing_sim.busy_packages):
+            #     continue
+            if pkg_nm in globally_assigned:   
                 continue
 
+            globally_assigned.add(pkg_nm)  
             window = routing_sim.active_packages[pkg_nm].time_window
             td, rt = sample_true_delivery_return_time(
                 depot_loc,
