@@ -152,8 +152,17 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
         return
     
     # Optional: be explicit about ordering by START (safe)
-    considered_ie = sorted(considered_ie[:num_to_consider], key=lambda ie: ie.timestamps[MODE.START])
+    # considered_ie = sorted(considered_ie[:num_to_consider], key=lambda ie: ie.timestamps[MODE.START])
     # considered_ie = considered_ie[:num_to_consider]
+    considered_ie = sorted(
+        considered_ie[:num_to_consider],
+        key=lambda ie: (
+            ie.timestamps[MODE.START],
+            ie.timestamps[MODE.FINISH],
+            ie.timestamps[MODE.SUCCESS],
+            ie.task_name,
+        )
+    )
 
     for ie in considered_ie:
         ie_stamp = ie.timestamps[MODE.START]

@@ -139,6 +139,8 @@ def setup_routing_sim(server, params_fn: str,
         depots=depots if depots else {},
         new_packages_created=False
     )
+
+    sim.task_rng = rng
     for drone_nm, props in server.agent_prop_set.items():
         props.available_at = 0.0
         props.at_depot = True
@@ -148,7 +150,7 @@ def setup_routing_sim(server, params_fn: str,
 
 
 def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_logger=None,
-                       allow_overlap=False) -> None:
+                       allow_overlap=False, dynamic_tasks=False) -> None:
     """
     Advance the routing simulator by one timestep.
     """
@@ -359,33 +361,36 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
 
 
         # # 4) Generate new packages probabilistically
-        # if rng.random() <= sim.new_request_prob and sim.current_time < 100:  
-        #     city = sim.city_params
-        #     lat_dist = uniform(loc=city.lat_start, scale=city.lat_end - city.lat_start)
-        #     lon_dist = uniform(loc=city.lon_start, scale=city.lon_end - city.lon_start)
-        #     pkg_name = f"pkg{len(sim.package_registry) + 1}"
-        #     new_package = generate_package_request(
-        #         pkg_name,
-        #         # Sample uniformly in bounds
-        #         lat_dist,
-        #         lon_dist,
-        #         sim.current_time,
-        #         sim.time_window_duration,
-        #         rng, dist_thresh=sim.distance_thresh, depots=sim.depots,
-        #         csv_logger=csv_logger
-        #     )
-        #     sim.num_total_packages += 1
-        #     sim.num_active_packages += 1
-        #     new_package_nm = f"pkg{sim.num_total_packages}"
-        #     logging.info(f"{new_package_nm} added!")
-        #     sim.active_packages[new_package_nm] = new_package
-        #     sim.new_packages_created = True
-        #     sim.package_registry[pkg_name] = {
-        #         "obj": new_package,             
-        #         "claimed_by": [],   
-        #         "winner": None,         
-        #         "time_assigned": [],
-        #     }
+        if dynamic_tasks and sim.current_time < 65:
+        
+            if sim.task_rng.random()<= sim.new_request_prob:  
+                city = sim.city_params
+                lat_dist = uniform(loc=city.lat_start, scale=city.lat_end - city.lat_start)
+                lon_dist = uniform(loc=city.lon_start, scale=city.lon_end - city.lon_start)
+                sim.num_total_packages += 1
+                pkg_name = f"pkg{sim.num_total_packages}"
+                new_package = generate_package_request(
+                    pkg_name,
+                    # Sample uniformly in bounds
+                    lat_dist,
+                    lon_dist,
+                    sim.current_time,
+                    sim.time_window_duration,
+                    sim.task_rng, dist_thresh=sim.distance_thresh, depots=sim.depots,
+                    csv_logger=csv_logger
+                )
+                
+                sim.num_active_packages += 1
+                logging.info(f"{pkg_name} added!")
+                
+                sim.active_packages[pkg_name] = new_package
+                sim.new_packages_created = True
+                sim.package_registry[pkg_name] = {
+                    "obj": new_package,             
+                    "claimed_by": [],   
+                    "winner": None,         
+                    "time_assigned": [],
+                }  
 
 
 
@@ -519,23 +524,36 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             sim.num_active_packages -= 1
 
         # # 4) Generate new packages probabilistically
-        # if rng.random() <= sim.new_request_prob:
-        #     lat_start, lat_end = sim.city_params.lat_start, sim.city_params.lat_end
-        #     lon_start, lon_end = sim.city_params.lon_start, sim.city_params.lon_end
-        #     new_package = generate_package_request(
-        #         # Sample uniformly in bounds
-        #         rng.uniform(lat_start, lat_end),
-        #         rng.uniform(lon_start, lon_end),
-        #         sim.current_time,
-        #         sim.time_window_duration,
-        #         rng
-        #     )
-        #     sim.num_total_packages += 1
-        #     sim.num_active_packages += 1
-        #     new_package_nm = f"pkg{sim.num_total_packages}"
-        #     logging.info(f"{new_package_nm} added!")
-        #     sim.active_packages[new_package_nm] = new_package
-        #     sim.new_packages_created = True
+        if dynamic_tasks and sim.current_time < 65:
+        
+            if sim.task_rng.random()<= sim.new_request_prob:  
+                city = sim.city_params
+                lat_dist = uniform(loc=city.lat_start, scale=city.lat_end - city.lat_start)
+                lon_dist = uniform(loc=city.lon_start, scale=city.lon_end - city.lon_start)
+                sim.num_total_packages += 1
+                pkg_name = f"pkg{sim.num_total_packages}"
+                new_package = generate_package_request(
+                    pkg_name,
+                    # Sample uniformly in bounds
+                    lat_dist,
+                    lon_dist,
+                    sim.current_time,
+                    sim.time_window_duration,
+                    sim.task_rng, dist_thresh=sim.distance_thresh, depots=sim.depots,
+                    csv_logger=csv_logger
+                )
+                
+                sim.num_active_packages += 1
+                logging.info(f"{pkg_name} added!")
+                
+                sim.active_packages[pkg_name] = new_package
+                sim.new_packages_created = True
+                sim.package_registry[pkg_name] = {
+                    "obj": new_package,             
+                    "claimed_by": [],   
+                    "winner": None,         
+                    "time_assigned": [],
+                }  
 
         # 5) Grey markers for sites
         for pkg_nm, pp in sim.active_packages.items():

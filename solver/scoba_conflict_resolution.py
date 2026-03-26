@@ -88,6 +88,7 @@ class SCoBAAlgorithm:
                     # Other conflicted agents to modify
                     others = set(agents)
                     others.discard(keep_agent)
+                    
 
                     for other in others:
                         # Remove previous utility contribution and its allocation for that agent

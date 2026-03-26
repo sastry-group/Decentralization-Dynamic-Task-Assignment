@@ -358,6 +358,8 @@ def parse_commandline():
     p.add_argument("--init_method", choices=["greedy", "random", "empty"], default="greedy")
     p.add_argument("--allow-overlap", action="store_true",
                    help="Allow overlapping claims (race at arrival). Default: False.")
+    p.add_argument("--dynamic_tasks", action="store_true",
+                   help="Whether to allow new tasks to arrive during the simulation. Default: False.")
 
     p.add_argument("--comms_mode", type=str, default="full")        
     p.add_argument("--depot-order", type=str, default="asc",
@@ -386,7 +388,8 @@ def main():
             )
         params_fn = PARAMS_BY_DEPOTS[args["n_depots"]]
     
-    rng = np.random.default_rng(args["seed"])
+    # rng = np.random.default_rng(args["seed"])
+    base_seed = args["seed"]
     comms_dict = comms_graph_from_mode(args["comms_mode"], args["n_depots"])
 
     trials = args['trials']
@@ -404,6 +407,7 @@ def main():
         num_init = int(round(1.5 * args["n_drones"]))
 
     overlap = "overlap" if args["allow_overlap"] else "nooverlap"
+    dynamic_tasks = "dynamic" if args["dynamic_tasks"]  else "static"
 
     log_dir = (
         f"dr{args['n_drones']}_dep{args['n_depots']}_pkgnum{num_init}"
@@ -416,6 +420,7 @@ def main():
         f"_init-{init_tag}"
         f"_dporder-{order_tag}"
         f"_overlap-{overlap}"
+        f"_tasks-{dynamic_tasks}"
     )
     out_dir = ROOT / "results" / "logs" / log_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -464,6 +469,7 @@ def main():
     drone_ordering, drone_set = build_drones(args["n_drones"], depots)
 
     allow_overlap = bool(args["allow_overlap"])
+    dynamic_tasks = bool(args["dynamic_tasks"])
 
     if args["plot_comms"]:
         plot_comms_graph(comms_dict, depots=depots, log_dir=log_dir)
@@ -493,6 +499,9 @@ def main():
    
 
     for trial in range(trials):
+        trial_seed = base_seed + trial
+        rng = np.random.default_rng(trial_seed)   
+        task_rng = np.random.default_rng(trial_seed + 9999) # fixing task rng
         print(f"Trial {trial+1}/{trials}")
 
         props = {name: DroneProperties(tree=SearchTree(), interaction_events=[])
@@ -513,10 +522,10 @@ def main():
             num_init_requests=num_init,
             new_request_prob=args["new_request_prob"],
             time_window_duration=args["time_window"],
-            rng=rng,
+            rng=task_rng,
             depots=depots,
             csv_logger=csv_logger,
-            in_transit_packages=in_transit_pkgs,
+            in_transit_packages=None,
         )
 
         if args["plot_init"]:
@@ -565,7 +574,7 @@ def main():
             else:
                 logging.info("No active packages. Skipping assignment.")
 
-            update_routing_sim(trial, sim, server, rng, csv_logger=csv_logger, allow_overlap=allow_overlap)
+            update_routing_sim(trial, sim, server, rng, csv_logger=csv_logger, allow_overlap=allow_overlap, dynamic_tasks=dynamic_tasks)
             if sim.new_packages_created and args["plot_init"]:
                 plot_initial_map(
                     city,

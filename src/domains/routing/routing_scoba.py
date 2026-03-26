@@ -326,6 +326,9 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
             else:
                 routing_sim.active_packages.pop(pkg_nm, None)
                 routing_sim.num_active_packages -= 1
+                routing_sim.busy_packages[pkg] = routing_sim.active_packages.pop(pkg)
+                routing_sim.num_active_packages -= 1
+
 
             if csv_logger:
                 csv_logger.log("drone_assignment.csv", {
