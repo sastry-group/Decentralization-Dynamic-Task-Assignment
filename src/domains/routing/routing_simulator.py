@@ -361,7 +361,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
 
 
         # # 4) Generate new packages probabilistically
-        if dynamic_tasks and sim.current_time < 35:
+        if dynamic_tasks and sim.current_time < 100:
         
             if sim.task_rng.random()<= sim.new_request_prob:  
                 city = sim.city_params
@@ -524,7 +524,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             sim.num_active_packages -= 1
 
         # # 4) Generate new packages probabilistically
-        if dynamic_tasks and sim.current_time < 35:
+        if dynamic_tasks and sim.current_time < 100:
         
             if sim.task_rng.random()<= sim.new_request_prob:  
                 city = sim.city_params
@@ -617,7 +617,7 @@ def update_time_windows(sim, server, csv_logger=None) -> None:
                 })
 
         # now sort by the return timestamp
-        interaction_events.sort(key=lambda ev: ev.timestamps[MODE.FINISH])
+        interaction_events.sort(key=lambda ev: ev.timestamps[MODE.SUCCESS])
         server.agent_prop_set[drone_nm].interaction_events = interaction_events
 
 

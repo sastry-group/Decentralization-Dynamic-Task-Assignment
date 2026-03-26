@@ -133,7 +133,7 @@ def expected_hungarian(server: RoutingAllocation, routing_sim: RoutingSimulator,
 
         # Available packages: exclude prev-blocked, busy, and already-claimed this round
         if allow_overlap:
-            available_pkgs = [p for p in in_range if p not in prev_blocked]
+            available_pkgs = [p for p in in_range if p not in prev_blocked and p not in globally_assigned]
         else:
             available_pkgs = [
                 p for p in in_range
@@ -142,9 +142,23 @@ def expected_hungarian(server: RoutingAllocation, routing_sim: RoutingSimulator,
                 and p not in globally_assigned
             ]
 
+
         if not local_drones or not available_pkgs:
             logging.info(f"[Hungarian] depot {depot_num}: no drones or no packages, skipping.")
             continue
+
+        logging.info(f"[Hungarian] depot {depot_num}: {len(local_drones)} drones, "
+                     f"{len(in_range)} pkgs in range (pre-filter), "
+                     f"{len(available_pkgs)} pkgs available (post-filter), "
+                     f"prev_blocked={len(prev_blocked)}, "
+                     f"globally_assigned={len(globally_assigned)}, "
+                     f"busy={len(routing_sim.busy_packages)}")
+        for dn in local_drones:
+            logging.info(f"  drone={dn} depot_loc={server.agent_set[dn].depot_loc}")
+        for pkg in available_pkgs[:5]:  # first 5 to avoid spam
+            pp = routing_sim.active_packages[pkg]
+            logging.info(f"  pkg={pkg} delivery_loc={pp.delivery}")
+
 
         n_d = len(local_drones)
         n_p = len(available_pkgs)
@@ -178,6 +192,11 @@ def expected_hungarian(server: RoutingAllocation, routing_sim: RoutingSimulator,
             continue
 
         row_ind, col_ind = linear_sum_assignment(cost)
+
+        for i, j in zip(row_ind, col_ind):
+            if cost[i, j] < 1.0:
+                globally_assigned.add(available_pkgs[j]) 
+
         logging.info(f"[Hungarian] depot {depot_num} assignments: "
                      f"{ {local_drones[i]: available_pkgs[j] for i, j in zip(row_ind, col_ind) if cost[i,j] < 1.0} }")
 
@@ -321,7 +340,7 @@ def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, 
         for drone_id in depot_drones:
             ie_idx = None
             #filtering interaction events based on in_range
-            server.agent_prop_set[drone_id].interaction_events.sort(key=lambda ev: ev.timestamps[MODE.FINISH])
+            server.agent_prop_set[drone_id].interaction_events.sort(key=lambda ev: ev.timestamps[MODE.SUCCESS])
             for idx, ie in enumerate(server.agent_prop_set[drone_id].interaction_events):
                 if (
                     ie.task_name not in all_assigned_pkgs

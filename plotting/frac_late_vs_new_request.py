@@ -178,7 +178,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(probs)
 ax.set_xlabel("New-request probability")
 ax.set_ylabel("Mean fraction of late packages")
-ax.set_ylim(0, 0.6)
+ax.set_ylim(0, 0.4)
 
 fig_name = (
     f"late_combined_"
