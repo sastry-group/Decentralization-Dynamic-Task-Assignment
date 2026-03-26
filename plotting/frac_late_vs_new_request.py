@@ -8,7 +8,7 @@ import itertools
 import pandas as pd
 
 
-base_dir = "results/logs/dp5_dr15_pkg22_plus"
+base_dir = "results/logs/dp5_dr15_pk22_dynT_win30"
 output_dir = "results"
 os.makedirs(output_dir, exist_ok=True)
 
@@ -22,7 +22,7 @@ run_folders = sorted(
 records = []
 
 pattern = re.compile(
-    r"dr(?P<dr>\d+)_dep(?P<dep>\d+)_pkgnum(?P<pkg>\d+)_ntrials(?P<ntrials>\d+)_"
+    r"dr(?P<dr>\d+)_dep(?P<dep>\d+)_pkgnum(?P<pkg>\d+)_ntrials(?P<ntrials>\d+)_nsteps(?P<nsteps>\d+)_"
     r"probpt(?P<prob>\d+)_win(?P<win>\d+)_"
     r"(?P<algo>[^_]+)_"
     r"comms-(?P<comms_radius>\d+)_"
@@ -178,7 +178,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(probs)
 ax.set_xlabel("New-request probability")
 ax.set_ylabel("Mean fraction of late packages")
-ax.set_ylim(0, 0.4)
+ax.set_ylim(0, 0.6)
 
 fig_name = (
     f"late_combined_"

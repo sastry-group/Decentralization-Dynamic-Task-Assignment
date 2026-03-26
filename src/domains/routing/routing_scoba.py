@@ -324,10 +324,10 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                 routing_sim.package_registry[pkg_nm]["claimed_by"].append(drone_nm)
                 routing_sim.package_registry[pkg_nm]["time_assigned"].append(time_step)
             else:
-                routing_sim.active_packages.pop(pkg_nm, None)
+                routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages.pop(pkg_nm)
                 routing_sim.num_active_packages -= 1
-                routing_sim.busy_packages[pkg] = routing_sim.active_packages.pop(pkg)
-                routing_sim.num_active_packages -= 1
+
+
 
 
             if csv_logger:

@@ -361,7 +361,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
 
 
         # # 4) Generate new packages probabilistically
-        if dynamic_tasks and sim.current_time < 65:
+        if dynamic_tasks and sim.current_time < 35:
         
             if sim.task_rng.random()<= sim.new_request_prob:  
                 city = sim.city_params
@@ -524,7 +524,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             sim.num_active_packages -= 1
 
         # # 4) Generate new packages probabilistically
-        if dynamic_tasks and sim.current_time < 65:
+        if dynamic_tasks and sim.current_time < 35:
         
             if sim.task_rng.random()<= sim.new_request_prob:  
                 city = sim.city_params
@@ -562,6 +562,7 @@ def update_routing_sim(trial, sim, server, rng: np.random.Generator = None, csv_
             curr_sites_locs_cols.append((pp.delivery, "grey"))
 
         sim.curr_drone_site_locs = CurrDroneSiteLocs(curr_drone_locs_cols, curr_sites_locs_cols)
+    
 
 
 
