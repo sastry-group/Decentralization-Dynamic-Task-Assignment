@@ -29,19 +29,19 @@ def create_comm_graph(depots: Dict[int, List[str]]) -> Dict[str, List[str]]:
 
 
 
-def group_welfare(assignments, group, p_cache, reward):
-    # assignments: dict drone->pkg (pkg can be None)
-    # group: iterable of drones to include
-    # returns sum_t reward * max_{drone in group assigned to t} p(drone,t)
-    best_by_pkg = {}
-    for dn in group:
-        pkg = assignments.get(dn)
-        if pkg is None:
-            continue
-        p = p_cache.get((dn, pkg), 0.0)
-        if (pkg not in best_by_pkg) or (p > best_by_pkg[pkg]):
-            best_by_pkg[pkg] = p
-    return reward * sum(best_by_pkg.values())
+# def group_welfare(assignments, group, p_cache, reward):
+#     # assignments: dict drone->pkg (pkg can be None)
+#     # group: iterable of drones to include
+#     # returns sum_t reward * max_{drone in group assigned to t} p(drone,t)
+#     best_by_pkg = {}
+#     for dn in group:
+#         pkg = assignments.get(dn)
+#         if pkg is None:
+#             continue
+#         p = p_cache.get((dn, pkg), 0.0)
+#         if (pkg not in best_by_pkg) or (p > best_by_pkg[pkg]):
+#             best_by_pkg[pkg] = p
+#     return reward * sum(best_by_pkg.values())
 
 
 
