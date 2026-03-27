@@ -125,9 +125,12 @@ def generate_search_tree(server: Any, agent_name: str, tasks_to_consider: set[st
 
 
     tree = server.agent_prop_set[agent_name].tree
+    if len(tree.nodes) > 0:
+        logging.debug(f"[Tree] clearing {len(tree.nodes)} nodes for {agent_name}")
     tree.nodes.clear()
     tree.child_ids.clear()
     tree.parent_id.clear()
+
 
     # recreate root node (Julia always starts from root)
     tree.nodes.append(

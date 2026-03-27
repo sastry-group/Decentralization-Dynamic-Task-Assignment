@@ -8,7 +8,7 @@ import itertools
 import pandas as pd
 
 
-base_dir = "results/logs/4Paper_dr15_dp5_steps200_dynT_win30"
+base_dir = "results/logs/4Paper_dr15_dp5_steps200_dynT_win30_v2"
 output_dir = "results"
 os.makedirs(output_dir, exist_ok=True)
 

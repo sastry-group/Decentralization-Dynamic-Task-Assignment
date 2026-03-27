@@ -509,7 +509,7 @@ def main():
         server = RoutingAllocation(agent_set=drone_set,
                                     agent_prop_set=props,
                                     agent_ordering=drone_ordering,
-                                    max_tasks_to_consider=10000,
+                                    max_tasks_to_consider=1000,
                                     conflict_threshold=100)
 
 

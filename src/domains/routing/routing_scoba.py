@@ -93,6 +93,9 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
         dnum = server.agent_set[drone_nm].depot_number
         all_drones_by_depot.setdefault(dnum, []).append(drone_nm)
         if dp.at_depot:
+            # n_events = len(server.agent_prop_set[drone_nm].interaction_events)
+            # logging.info(f"[SCoBA] drone={drone_nm} interaction_events={n_events} "
+            #          f"tree_nodes={len(server.agent_prop_set[drone_nm].tree.nodes)}")
             available_drones.setdefault(dnum, []).append(drone_nm)
 
     if not available_drones:
@@ -116,15 +119,15 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
     else:
         components = sorted(components, key=lambda c: min(c))
 
-    logging.info(f"[SCoBA] available_depots={sorted(available_depots)}")
-    logging.info(
-        "[SCoBA] undirected_comms=" +
-        str({d: sorted(list(neigh)) for d, neigh in undirected_comms.items()})
-    )
-    logging.info(
-        "[SCoBA] components=" +
-        str([sorted(list(c)) for c in components])
-    )
+    # logging.info(f"[SCoBA] available_depots={sorted(available_depots)}")
+    # logging.info(
+    #     "[SCoBA] undirected_comms=" +
+    #     str({d: sorted(list(neigh)) for d, neigh in undirected_comms.items()})
+    # )
+    # logging.info(
+    #     "[SCoBA] components=" +
+    #     str([sorted(list(c)) for c in components])
+    # )
 
     # ------------------------------------------------------------------
     # 3. Compute previously-visible packages PER DEPOT using undirected neighborhoods
@@ -134,16 +137,16 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
     if allow_overlap:
         active_now = set(routing_sim.active_packages.keys())
 
-        logging.info(
-            f"[SCoBA] active_pkgs={sorted(routing_sim.active_packages.keys())}"
-        )
-        logging.info(
-            f"[SCoBA] package_claims=" +
-            str({pkg: sorted(list(claims)) for pkg, claims in getattr(routing_sim, 'package_claims', {}).items()})
-        )
-        logging.info(
-            f"[SCoBA] package_winners={getattr(routing_sim, 'package_winners', {})}"
-        )
+        # logging.info(
+        #     f"[SCoBA] active_pkgs={sorted(routing_sim.active_packages.keys())}"
+        # )
+        # logging.info(
+        #     f"[SCoBA] package_claims=" +
+        #     str({pkg: sorted(list(claims)) for pkg, claims in getattr(routing_sim, 'package_claims', {}).items()})
+        # )
+        # logging.info(
+        #     f"[SCoBA] package_winners={getattr(routing_sim, 'package_winners', {})}"
+        # )
         for d in all_drones_by_depot:
             vis_depots = {d} | undirected_comms.get(d, set())
 
@@ -163,8 +166,8 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
 
             previously_visible[d] = prev
 
-        for d in sorted(previously_visible):
-            logging.info(f"[SCoBA] depot {d} previously-visible pkgs: {sorted(previously_visible[d])}")
+        # for d in sorted(previously_visible):
+        #     logging.info(f"[SCoBA] depot {d} previously-visible pkgs: {sorted(previously_visible[d])}")
 
     # ------------------------------------------------------------------
     # 3. Determine depot processing order
@@ -188,10 +191,10 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
         for d in component_depots:
             component_drones.extend(available_drones.get(d, []))
 
-        logging.info(
-            f"[SCoBA][component] depots={component_depots} "
-            f"drones={component_drones}"
-        )
+        # logging.info(
+        #     f"[SCoBA][component] depots={component_depots} "
+        #     f"drones={component_drones}"
+        # )
 
         if not component_drones:
             continue
@@ -229,6 +232,9 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
             depot_assigned_pkgs: Set[str] = set()
 
             for drone_nm in depot_drones:
+                # logging.info(f"[SCoBA] drone={drone_nm} PRE-build "
+                            # f"interaction_events={len(server.agent_prop_set[drone_nm].interaction_events)} "
+                            # f"tree_nodes={len(server.agent_prop_set[drone_nm].tree.nodes)}")
                 pkgs_to_consider = pkgs_available - depot_assigned_pkgs
                 all_considered_tasks[drone_nm] = set(pkgs_to_consider)
 
@@ -238,7 +244,9 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                 sp_fn = success_prob_factory(drone_nm)
                 generate_search_tree(server, drone_nm, pkgs_to_consider, sp_fn, util_val_fn, 0.0)
                 tree = server.agent_prop_set[drone_nm].tree
-
+                # logging.info(f"[SCoBA] drone={drone_nm} post-build "
+                #             f"interaction_events={len(server.agent_prop_set[drone_nm].interaction_events)} "
+                #             f"tree_nodes={len(tree.nodes)}")
                 if not tree:
                     continue
 
@@ -251,16 +259,16 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                 assignment_util += dec_node.util
                 task_util_allocation[drone_nm] = TaskUtil(task=dec_node.task_name, util=dec_node.util)
 
-                logging.info(
-                    f"[SCoBA][tentative] drone={drone_nm} depot={depot_number} "
-                    f"chosen={dec_node.task_name} util={dec_node.util:.4f}"
-                )
+                # logging.info(
+                #     f"[SCoBA][tentative] drone={drone_nm} depot={depot_number} "
+                #     f"chosen={dec_node.task_name} util={dec_node.util:.4f}"
+                # )
 
-        logging.info(
-            "[SCoBA][pre-conflict] " +
-            str({dn: {"task": tu.task, "util": round(tu.util, 4)}
-                 for dn, tu in task_util_allocation.items()})
-        )
+        # logging.info(
+        #     "[SCoBA][pre-conflict] " +
+        #     str({dn: {"task": tu.task, "util": round(tu.util, 4)}
+        #          for dn, tu in task_util_allocation.items()})
+        # ) 
 
         if not task_util_allocation:
             continue
@@ -288,11 +296,11 @@ def scoba_routing(server, routing_sim, rng: Any = None, csv_logger=None, trial_i
                 0.0,
             )
 
-        logging.info(
-            "[SCoBA][post-conflict] " +
-            str({dn: {"task": tu.task, "util": round(tu.util, 4)}
-                 for dn, tu in group_allocation.items()})
-        )
+        # logging.info(
+        #     "[SCoBA][post-conflict] " +
+        #     str({dn: {"task": tu.task, "util": round(tu.util, 4)}
+        #          for dn, tu in group_allocation.items()})
+        # )
 
         # --------------------------------------------------------------
         # Commit immediately for this component

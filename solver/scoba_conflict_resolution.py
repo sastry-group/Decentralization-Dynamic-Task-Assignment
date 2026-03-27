@@ -60,7 +60,10 @@ class SCoBAAlgorithm:
 
         while self.heap:
             _, _, P = heapq.heappop(self.heap)
-
+            logging.info(f"[CBS] popped node id={P.id} util={P.util:.4f} "
+                         f"heap_size={len(self.heap)} "
+                         f"considered_tasks_total="
+                         f"{sum(len(v) for v in P.considered_tasks.values())}")
             # Build reverse map: task -> [agents who got it]
             task_to_agents: Dict[str, list[str]] = {}
             for agent, tu in P.task_allocation.items():
