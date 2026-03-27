@@ -314,7 +314,7 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
         logging.info(f"[IBR] initial assigned: { {dn: assigned.get(dn) for dn in sorted(assigned)} }")      
     # --- Iterative best response (GLOBAL), information-aware ---
     # Important: each drone "sees" only drones from depots in its comms neighborhood.
-    k_rounds = 20
+    k_rounds = 500
     # Ensure iteration over depots.values() follows depot_order and is deterministic
     depots = {d: sorted(depots[d]) for d in depot_order if d in depots}
     all_considered_drones = [dn for drones in depots.values() for dn in drones]
