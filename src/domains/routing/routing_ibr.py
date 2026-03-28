@@ -9,23 +9,22 @@ import random
 from solver.scoba_types import InteractionEvent, MODE, GenericAllocation as RoutingAllocation
 from domains.routing.routing_types import RoutingSimulator, EuclideanLatLongMetric, convert_to_vector
 from domains.routing.routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes
-from domains.graph_builder import build_comm_structure
 from .travel_model import delivery_success_prob_ibr
 
 
 
 
-def create_comm_graph(depots: Dict[int, List[str]]) -> Dict[str, List[str]]:
-    """
-    Create a communication graph where each agent can only see others in the same depot.
-    Returns a dictionary mapping agent_id -> list of neighbor agent_ids.
-    """
-    comm_graph = {}
-    for drone_list in depots.values():
-        for dn in drone_list:
-            # Exclude self from neighbors
-            comm_graph[dn] = [other_dn for other_dn in drone_list if other_dn != dn]
-    return comm_graph
+# def create_comm_graph(depots: Dict[int, List[str]]) -> Dict[str, List[str]]:
+#     """
+#     Create a communication graph where each agent can only see others in the same depot.
+#     Returns a dictionary mapping agent_id -> list of neighbor agent_ids.
+#     """
+#     comm_graph = {}
+#     for drone_list in depots.values():
+#         for dn in drone_list:
+#             # Exclude self from neighbors
+#             comm_graph[dn] = [other_dn for other_dn in drone_list if other_dn != dn]
+#     return comm_graph
 
 
 

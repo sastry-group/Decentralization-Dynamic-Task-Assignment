@@ -53,13 +53,18 @@ from domains.routing.routing_ibr import iterative_best_response
 from solver.scoba_types                 import GenericAllocation as RoutingAllocation
 from solver.scoba_types import SearchTree
 from domains.routing.travel_model import initialize_travel_model
+from domains.routing.graph_builder import (
+    build_comms_graph,
+    comms_dict_from_graph,
+    graph_metrics,
+)
 
 
 # Constants and file paths
 PARAM_FILES = ROOT / "param_files"
 TRAVELTIME_EST = PARAM_FILES / "scoba_data.npz"
 PARAMS_BY_DEPOTS = {
-    2: str(PARAM_FILES / "sf_bb_params_2dpts.toml"),
+    2: str(PARAM_FILES / "sf_bb_params_2dpts_test.toml"),
     5: str(PARAM_FILES / "sf_bb_params.toml"),
     6: str(PARAM_FILES / "sf_bb_params_more_overlap.toml"),
     10: str(PARAM_FILES / "sf_bb_params_10dpts.toml"),
@@ -144,193 +149,14 @@ def build_drones(n_drones: int, depots: dict[int, Depot]):
 
     return drone_ordering, drone_set
 
+
+
 def comms_graph_from_mode(mode: str, n_depots: int):
-    """
-    Returns comms_dict: depot -> list[neighbor_depot]
+    G = build_comms_graph(n_depots, mode)
+    metrics = graph_metrics(G)
+    comms_dict = comms_dict_from_graph(G)
+    return comms_dict, metrics
 
-    Generic modes (any n_depots): "full", "none"
-    Depot-specific modes: "5_full", "5_ring", "5_none", "5_edge_rm_12_T2", etc.
-    """
-    depots = list(range(1, n_depots + 1))
-    valid = set(depots)
-
-    if mode == "full":
-        return {d: [x for x in depots if x != d] for d in depots}
-    if mode == "none":
-        return {d: [] for d in depots}
-
-    EXAMPLES = {
-        # ----- 2 depots -----
-        "2_full": {
-            1: [2],
-            2: [1],
-        },
-        "2_none": {
-            1: [],
-            2: [],
-        },
-
-        # ----- 3 depots -----
-        "3_full": {
-            1: [2, 3],
-            2: [1],
-            3: [1, 2],
-        },
-
-        # ----- 5 depots -----
-        "5_full": {
-            1: [2, 3, 4, 5],
-            2: [1, 3, 4, 5],
-            3: [1, 2, 4, 5],
-            4: [1, 2, 3, 5],
-            5: [1, 2, 3, 4],
-        },
-
-        # edge removed (1,2), T(G)=2
-        "5_edge_rm_12_T2": {
-            1: [3, 4, 5],
-            2: [1, 3, 4, 5],
-            3: [1, 2, 4, 5],
-            4: [1, 2, 3, 5],
-            5: [1, 2, 3, 4],
-        },
-
-        # edge removed (1,2), (3,1), T(G)=3
-        "5_edge_rm_12_31_T3": {
-            1: [3, 4, 5],
-            2: [1, 3, 4, 5],
-            3: [2, 4, 5],
-            4: [1, 2, 3, 5],
-            5: [1, 2, 3, 4],
-        },
-
-        # edge removed (1,2), (3,1), (4,3), T(G)=4
-        "5_edge_rm_12_31_43_T4": {
-            1: [3, 4, 5],
-            2: [1, 3, 4, 5],
-            3: [2, 4, 5],
-            4: [1, 2, 5],
-            5: [1, 2, 3, 4],
-        },
-
-        # ring
-        "5_ring": {
-            1: [5, 2],
-            2: [1, 3],
-            3: [2, 4],
-            4: [3, 5],
-            5: [4, 1],
-        },
-
-        # none
-        "5_none": {
-            1: [],
-            2: [],
-            3: [],
-            4: [],
-            5: [],
-        },
-
-        # ----- 6 depots -----
-        "6_full": {
-            1: [2, 3, 4, 5, 6],
-            2: [1, 3, 4, 5, 6],
-            3: [1, 2, 4, 5, 6],
-            4: [1, 2, 3, 5, 6],
-            5: [1, 2, 3, 4, 6],
-            6: [1, 2, 3, 4, 5],
-        },
-
-        # ring (diameter = 3)
-        "6_ring": {
-            1: [6, 2],
-            2: [1, 3],
-            3: [2, 4],
-            4: [3, 5],
-            5: [4, 6],
-            6: [5, 1],
-        },
-
-        # remove a few long-range edges → higher T(G)
-        "6_edge_rm_12_34_T3": {
-            1: [3, 4, 5, 6],
-            2: [3, 4, 5, 6],
-            3: [1, 2, 5, 6],
-            4: [1, 2, 5, 6],
-            5: [1, 2, 3, 4, 6],
-            6: [1, 2, 3, 4, 5],
-        },
-
-        "6_none": {
-            1: [],
-            2: [],
-            3: [],
-            4: [],
-            5: [],
-            6: [],
-        },
-
-
-        # ----- 10 depots -----
-        "10_full": {
-            i: [j for j in range(1, 11) if j != i]
-            for i in range(1, 11)
-        },
-
-        # ring (diameter = 5)
-        "10_ring": {
-            1: [10, 2],
-            2: [1, 3],
-            3: [2, 4],
-            4: [3, 5],
-            5: [4, 6],
-            6: [5, 7],
-            7: [6, 8],
-            8: [7, 9],
-            9: [8, 10],
-            10: [9, 1],
-        },
-
-        # sparse but connected (banded graph, T(G)≈3–4)
-        "10_band_T3": {
-            i: [j for j in range(1, 11) if 0 < abs(i - j) <= 2]
-            for i in range(1, 11)
-        },
-
-        # very sparse chain (worst-case propagation)
-        "10_chain_T9": {
-            1: [2],
-            2: [1, 3],
-            3: [2, 4],
-            4: [3, 5],
-            5: [4, 6],
-            6: [5, 7],
-            7: [6, 8],
-            8: [7, 9],
-            9: [8, 10],
-            10: [9],
-        },
-
-        "10_none": {
-            i: [] for i in range(1, 11)
-        },
-
-    }
-
-
-
-    if mode not in EXAMPLES:
-        raise ValueError(f"Unknown comms mode: {mode}")
-
-    raw = EXAMPLES[mode]
-
-    # Trim / normalize to current n_depots
-    out = {}
-    for d in depots:
-        nbrs = raw.get(d, [])
-        out[d] = [x for x in nbrs if x in valid and x != d]
-
-    return out
 
 
 
@@ -390,7 +216,7 @@ def main():
     
     # rng = np.random.default_rng(args["seed"])
     base_seed = args["seed"]
-    comms_dict = comms_graph_from_mode(args["comms_mode"], args["n_depots"])
+    comms_dict, comms_metrics = comms_graph_from_mode(args["comms_mode"], args["n_depots"])
 
     trials = args['trials']
     results = {'trials': trials}
@@ -438,7 +264,17 @@ def main():
     logging.info(f"params_fn={params_fn}")
     logging.info(f"comms_dict={comms_dict}")
     
-    
+    metrics_d = comms_metrics.to_dict()
+    logging.info(f"comms_metrics={metrics_d}")
+    print(
+        f"  Comms graph: mode={comms_tag}  n_depots={args['n_depots']}\n"
+        f"    τ(G)={comms_metrics.tau}  "
+        f"α*(Ḡ)={comms_metrics.alpha_star_recip:.2f}  "
+        f"α(Ḡ)={comms_metrics.alpha_recip}\n"
+        f"    PoA bounds:  general ≥ {comms_metrics.poa_lb_general:.4f}  "
+        f"consistent ≥ {comms_metrics.poa_lb_consistent:.4f}  "
+        f"upper ≤ {comms_metrics.poa_ub:.4f}"
+    )
     # travel-time estimates
     arrs = np.load(str(TRAVELTIME_EST))
     points = arrs["points"]
@@ -604,6 +440,7 @@ def main():
     results['in_transit'] = in_transit_pkgs
     results['delivered'] = delivered_pkgs
     results['total'] = total_pkgs
+    results['comms_metrics'] = comms_metrics.to_dict()
 
     with open(out_dir / f"{log_dir}.json", 'w') as outf:
         json.dump(results, outf, indent=2)
