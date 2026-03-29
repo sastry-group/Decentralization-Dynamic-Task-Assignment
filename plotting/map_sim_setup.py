@@ -1,147 +1,194 @@
-import matplotlib.pyplot as plt
 import numpy as np
-from numpy.random import default_rng
-import matplotlib.cm as cm
-from matplotlib.lines import Line2D
-import matplotlib.colors as mcolors
+import matplotlib
+import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.lines import Line2D
+from matplotlib import cm
+from numpy.random import default_rng
 
+matplotlib.rcParams.update({
+    "font.family":        "serif",
+    "font.serif":         ["Times New Roman", "DejaVu Serif"],
+    "font.size":          9,
+    "axes.labelsize":     10,
+    "xtick.labelsize":    8,
+    "ytick.labelsize":    8,
+    "legend.fontsize":    8,
+    "legend.framealpha":  0.9,
+    "legend.edgecolor":   "0.8",
+    "axes.spines.top":    False,
+    "axes.spines.right":  False,
+    "axes.linewidth":     0.8,
+    "figure.dpi":         300,
+    "savefig.dpi":        300,
+    "savefig.bbox":       "tight",
+    "savefig.pad_inches": 0.05,
+})
 
-
-strong_colors = [
-    "#1f77b4",  # blue
-    "#d62728",  # red
-    "#2ca02c",  # green
-    "#ff7f0e",  # orange
-    "#9467bd",  # purple
-    "#8c564b",  # brown
-    "#e377c2",  # pink
-    "#7f7f7f",  # gray
-    "#bcbd22",  # yellow-green
-    "#17becf",  # cyan
-    "#000000",  # black
-    "#ff1493",  # deep pink
-    "#00ced1",  # dark turquoise
-    "#ffa07a",  # light salmon
-    "#20b2aa",  # light sea green
+# One distinct color per depot — used for depot marker, ellipse, and its drones
+DEPOT_PALETTE = [
+    "#4878CF",   # blue
+    "#D65F5F",   # red
+    "#6ACC65",   # green
+    "#B47CC7",   # purple
+    "#C4AD66",   # tan/gold
+    "#77BEDB",   # sky blue
+    "#F28E2B",   # orange
+    "#59A14F",   # dark green
 ]
 
+def plot_initial_map(
+    city_limits,
+    depots,
+    drones,
+    package_dict,
+    radius_km,
+    trial,
+    time_step=0,
+    show_city_box=True,
+    tag="",               # e.g. "narrow", "nominal", "broad"
+    show_drone_labels=False,   # turn off for clean publication figure
+    show_pkg_labels=False,     # turn off when many packages
+    output_dir="results",
+):
+    fig, ax = plt.subplots(figsize=(6, 5.5))
+    rng = default_rng(42)
 
+    n_depots = len(depots)
+    depot_color = {
+        i: DEPOT_PALETTE[(i - 1) % len(DEPOT_PALETTE)]
+        for i in depots
+    }
 
-def plot_initial_map(city_limits, depots, drones, package_dict, radius_km, trial, time_step = 0, show_city_box=True):
-
-    fig, ax = plt.subplots(figsize=(12, 10))
-    rng = default_rng(42) 
-    legend_elements = []
-    # deg_per_km = 1.0 / 110.2
-    # radius_deg = radius_km * deg_per_km
-
-    # Depots
-    cmap_depot = cm.get_cmap('viridis', len(depots))
-    depot_colors = {i: cmap_depot(i) for i in range(len(depots))}
+    # ── Sensing ellipses ──────────────────────────────────────────────────────
     for i, depot in depots.items():
         lon = depot.location.lon
         lat = depot.location.lat
         deg_per_km_lat = 1 / 110.574
         deg_per_km_lon = 1 / (111.320 * np.cos(np.deg2rad(lat)))
-
-        radius_lat = radius_km * deg_per_km_lat
-        radius_lon = radius_km * deg_per_km_lon
-
+        r_lat = radius_km * deg_per_km_lat
+        r_lon = radius_km * deg_per_km_lon
         ellipse = patches.Ellipse(
             (lon, lat),
-            width=2 * radius_lon,
-            height=2 * radius_lat,
-            edgecolor=depot_colors[i-1],
-            facecolor=depot_colors[i-1],
-            linestyle='--',
-            alpha=0.2
+            width=2 * r_lon,
+            height=2 * r_lat,
+            edgecolor=depot_color[i],
+            facecolor=depot_color[i],
+            linestyle="--",
+            linewidth=0.8,
+            alpha=0.15,
         )
         ax.add_patch(ellipse)
-        ax.scatter(lon, lat,
-                color=depot_colors[i-1], marker='o', s=300, alpha=0.4,
-                label='Depot' if i-1 == 0 else "")
-        ax.text(lon, lat + 0.002, f"Depot {i}", color='gray', fontsize=12)
-    legend_elements.append(Line2D([0], [0], marker='o', color='w', label='Depot',
-                                   markerfacecolor='gray', markersize=10))
 
-    # Drones
-    spread=0.003
-    drone_ids = list(drones.keys())
-    drone_colors = {
-        drone_id: strong_colors[i % len(strong_colors)]
-        for i, drone_id in enumerate(drone_ids)
-    }
-    
-    for drone_id in drone_ids:
-        drone = drones[drone_id]
-        loc = drone.depot_loc
+    # ── Depot markers ─────────────────────────────────────────────────────────
+    for i, depot in depots.items():
+        lon = depot.location.lon
+        lat = depot.location.lat
+        color = depot_color[i]
+        ax.scatter(lon, lat, color=color, marker="o", s=120,
+                   zorder=5, edgecolors="white", linewidths=0.6)
+        ax.text(lon + 0.001, lat + 0.0015, f"D{i}",
+                color=color, fontsize=8, fontweight="500", zorder=6)
+
+    # ── Drones — small triangles grouped at depot, no individual labels ───────
+    spread = 0.0025
+    drone_list = list(drones.keys())
+    for drone_id in drone_list:
+        drone  = drones[drone_id]
+        loc    = drone.depot_loc
+        dep_i  = drone.depot_number
+        color  = depot_color.get(dep_i, "#888888")
         offset_lon = rng.uniform(-spread, spread)
         offset_lat = rng.uniform(-spread, spread)
+        ax.scatter(
+            loc.lon + offset_lon, loc.lat + offset_lat,
+            color=color, marker="^", s=25,
+            edgecolors="white", linewidths=0.4,
+            zorder=4, alpha=0.85,
+        )
+        if show_drone_labels:
+            ax.text(loc.lon + offset_lon + 0.0003,
+                    loc.lat + offset_lat + 0.0003,
+                    drone_id, color=color, fontsize=6, zorder=5)
 
-        color = drone_colors[drone_id]
-        ax.scatter(loc.lon + offset_lon, loc.lat + offset_lat,
-                   color=color, marker='^', s=60)
-        ax.text(loc.lon + offset_lon + 0.0002, loc.lat + offset_lat + 0.0002,
-                drone_id, color=color, fontsize=9)
+    # ── Packages — small squares, no labels by default ────────────────────────
+    pkg_names = list(package_dict.keys())
+    pkg_lons  = [package_dict[n].delivery.lon for n in pkg_names]
+    pkg_lats  = [package_dict[n].delivery.lat for n in pkg_names]
+    ax.scatter(pkg_lons, pkg_lats,
+               color="#2d6a2d", marker="s", s=18,
+               edgecolors="white", linewidths=0.3,
+               zorder=3, alpha=0.85, label="Package")
+    if show_pkg_labels:
+        for name, lon, lat in zip(pkg_names, pkg_lons, pkg_lats):
+            ax.text(lon + 0.0005, lat + 0.0005, name,
+                    color="#2d6a2d", fontsize=5.5, zorder=4)
 
-        # Add custom legend item
-        legend_elements.append(Line2D([0], [0], marker='^', color='w', label=drone_id,
-                                      markerfacecolor=color, markersize=8))
-        
+    # ── City limits box ───────────────────────────────────────────────────────
+    if city_limits is not None and show_city_box:
+        lat_min = min(city_limits["lat_start"], city_limits["lat_end"])
+        lat_max = max(city_limits["lat_start"], city_limits["lat_end"])
+        lon_min = min(city_limits["lon_start"], city_limits["lon_end"])
+        lon_max = max(city_limits["lon_start"], city_limits["lon_end"])
+        rect = patches.Rectangle(
+            (lon_min, lat_min),
+            lon_max - lon_min,
+            lat_max - lat_min,
+            fill=False, linestyle="-",
+            linewidth=1.2, edgecolor="black", alpha=0.6, zorder=7,
+        )
+        ax.add_patch(rect)
 
-    # Packages
-    for name, pkg in package_dict.items():
-        loc = pkg.delivery
-        ax.scatter(loc.lon, loc.lat, color='green', marker='s', s=70, label='Package' if name == list(package_dict.keys())[0] else "")
-        ax.text(loc.lon + 0.001, loc.lat + 0.001, name, color='green', fontsize=9)
-    legend_elements.append(Line2D([0], [0], marker='s', color='w', label='Package',
-                                       markerfacecolor='green', markersize=8))
-
+    # ── Aspect ratio ──────────────────────────────────────────────────────────
     if city_limits is not None:
-        lat_start = city_limits['lat_start']
-        lat_end = city_limits['lat_end']
-        lon_start = city_limits['lon_start']
-        lon_end = city_limits['lon_end']
+        mid_lat = 0.5 * (city_limits["lat_start"] + city_limits["lat_end"])
+        ax.set_aspect(1.0 / np.cos(np.deg2rad(mid_lat)), adjustable="box")
 
-        # Ensure proper ordering
-        lat_min, lat_max = sorted([lat_start, lat_end])
-        lon_min, lon_max = sorted([lon_start, lon_end])
+    # ── Legend — compact, one entry per depot + packages + city box ───────────
+    legend_handles = []
+    for i in sorted(depots.keys()):
+        legend_handles.append(
+            Line2D([0], [0], marker="o", color="w", label=f"Depot {i}",
+                   markerfacecolor=depot_color[i],
+                   markeredgecolor="white", markersize=7)
+        )
+    # one drone entry showing depot-coloring convention
+    legend_handles.append(
+        Line2D([0], [0], marker="^", color="w", label="Drones (by depot)",
+               markerfacecolor="gray", markeredgecolor="white", markersize=6)
+    )
+    legend_handles.append(
+        Line2D([0], [0], marker="s", color="w", label=f"Packages (n={len(package_dict)-1})",
+               markerfacecolor="#2d6a2d", markeredgecolor="white", markersize=6)
+    )
+    if show_city_box:
+        legend_handles.append(
+            Line2D([0], [0], color="black", lw=1.2, label="Sampling area")
+        )
 
-        # # 1) Lock axes to the city bounds
-        # ax.set_xlim(lon_min, lon_max)
-        # ax.set_ylim(lat_min, lat_max)
+    ax.legend(
+        handles=legend_handles,
+        loc="upper left",
+        frameon=True,
+        borderpad=0.6,
+        labelspacing=0.35,
+        handletextpad=0.4,
+    )
 
-        # 2) Draw the bounding rectangle (optional)
-        if show_city_box:
-            rect = patches.Rectangle(
-                (lon_min, lat_min),
-                width=lon_max - lon_min,
-                height=lat_max - lat_min,
-                fill=False,
-                linestyle='-',
-                linewidth=2,
-                edgecolor='black',
-                alpha=0.7
-            )
-            ax.add_patch(rect)
-            legend_elements.append(Line2D([0], [0], color='black', lw=2, label='City Limits'))
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.grid(True, linewidth=0.4, linestyle=":", color="0.80")
 
-        # # Keep aspect roughly correct for degrees (lon degrees shrink with latitude)
-        mid_lat = 0.5 * (lat_min + lat_max)
-        ax.set_aspect(1.0 / np.cos(np.deg2rad(mid_lat)), adjustable='box')
-        # ax.set_aspect('equal', adjustable='box')
+    # subtitle showing scenario tag
+    if tag:
+        ax.set_title(f"Spatial conflict: {tag}", fontsize=9, pad=4)
 
-        ax.set_xlabel("Longitude")
-        ax.set_ylabel("Latitude")
-        ax.grid(True)
-        ax.legend(handles=legend_elements, title="Legend", bbox_to_anchor=(1.05, 1), loc='upper left')
-        plt.tight_layout()
-
-        plt.savefig(f"results/initial_map_trial_{trial}_time_{time_step}.png", dpi=200)
-        plt.close(fig)
-
-
+    suffix = f"_{tag}" if tag else ""
+    fname  = f"{output_dir}/initial_map_trial_{trial}_time_{time_step}{suffix}"
+    plt.savefig(fname + ".pdf")
+    plt.savefig(fname + ".png")
+    plt.close(fig)
+    print(f"Saved → {fname}.pdf / .png")
 
 def plot_comms_graph(comms_dict, depots, log_dir=None):
 

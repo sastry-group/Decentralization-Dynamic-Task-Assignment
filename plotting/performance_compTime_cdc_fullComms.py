@@ -12,12 +12,12 @@ import pandas as pd
 matplotlib.rcParams.update({
     "font.family":        "serif",
     "font.serif":         ["Times New Roman", "DejaVu Serif"],
-    "font.size":          10,
-    "axes.titlesize":     10,
-    "axes.labelsize":     10,
-    "xtick.labelsize":    9,
-    "ytick.labelsize":    9,
-    "legend.fontsize":    9,
+    "font.size":          13,
+    "axes.titlesize":     13,
+    "axes.labelsize":     13,
+    "xtick.labelsize":    11,
+    "ytick.labelsize":    11,
+    "legend.fontsize":    11,
     "legend.framealpha":  0.9,
     "legend.edgecolor":   "0.8",
     "axes.spines.top":    False,
@@ -35,7 +35,7 @@ matplotlib.rcParams.update({
 # ══════════════════════════════════════════════════════════════════════════════
 # CONFIG
 # ══════════════════════════════════════════════════════════════════════════════
-SWEEP = "density"     # "prob"   → x-axis = new-request probability
+SWEEP = "drones"     # "prob"   → x-axis = new-request probability
                     # "window" → x-axis = task window duration
                     # "drones" → x-axis = fleet configuration (dep, dr)
                     # "comms"  → x-axis = communication graph structure
@@ -43,7 +43,7 @@ SWEEP = "density"     # "prob"   → x-axis = new-request probability
 
 # Fixed values used when other variables are held constant
 FIX_PROB = 0.5     # used when SWEEP = "window", "drones", or "comms"
-FIX_WIN  = 45       # used when SWEEP = "prob", "drones", or "comms"
+FIX_WIN  = 30       # used when SWEEP = "prob", "drones", or "comms"
 
 # For comms sweep: define the display order of your graph structure names.
 # Put them in order from least to most communication.
@@ -68,8 +68,8 @@ DENSITY_LABELS = {
 
 # Base directories
 BASE_DIRS = {
-    "prob":   "results/logs/4Paper_dr15_dp5_steps200_dynT_win30",
-    "window": "results/logs/4Paper_dr15_dp5_steps200_dynT_varyWin_v2",
+    "prob":   "results/logs/4Paper_dr15_dp5_steps200_dynT_win30_v2",
+    "window": "results/logs/4Paper_dr15_dp5_steps200_dynT_varyWin",
     "drones": "results/logs/4Paper_varyDroneNum",
     "comms":  "results/logs/4Paper_commsGraphs_multiAlgo",   #
     "density": "results/logs/4Paper_packageDensity"
@@ -172,7 +172,7 @@ if SWEEP == "prob":
     df_plot      = df[df["win"] == FIX_WIN].copy()
     sweep_vals   = sorted(df_plot["prob"].unique())
     sweep_col    = "prob"
-    xlabel       = "New-request probability"
+    xlabel       = "New request probability"
     xtick_labels = [f"{v:.2f}" for v in sweep_vals]
     fix_desc     = f"win={FIX_WIN} min"
     fname_tag    = f"prob_fixwin{FIX_WIN}"
@@ -204,8 +204,8 @@ elif SWEEP == "drones":
     )
     sweep_vals   = [f"{r.dep}_{r.dr}" for r in fleet_configs]
     sweep_col    = "fleet_key"
-    xlabel       = "Fleet configuration"
-    xtick_labels = [f"{r.dep}dep·{r.dr}dr" for r in fleet_configs]
+    xlabel       = "Fleet configuration (#depots/#drones)"
+    xtick_labels = [f"{r.dep}/{r.dr}" for r in fleet_configs]
     fix_desc     = f"p={FIX_PROB}, win={FIX_WIN} min"
     fname_tag    = f"drones_fixprob{FIX_PROB}_win{FIX_WIN}"
 
@@ -321,16 +321,33 @@ comms_note = (
     SWEEP == "comms" and len(COMMS_SKIP_TIME & {a.lower() for a in algorithms}) > 0
 )
 
-fig, (ax1, ax2) = plt.subplots(
-    2, 1,
-    figsize=(4.5, 5.0),
-    sharex=True,
-    gridspec_kw={"height_ratios": [1, 0.85], "hspace": 0.08}
-)
+# fig, (ax1, ax2) = plt.subplots(
+#     2, 1,
+#     figsize=(3.8, 3.8),
+#     sharex=True,
+#     gridspec_kw={"height_ratios": [1, 0.75], "hspace": 0.10}
+# )
+# fig.subplots_adjust(bottom=0.15)
+fig1, ax1 = plt.subplots(figsize=(3.5, 3.5))
 
 x = np.arange(len(sweep_vals)) if SWEEP in ("drones", "comms", "density") else np.array(sweep_vals, dtype=float)
 
-# ── Panel (a): Fraction late ──────────────────────────────────────────────────
+
+# x-axis padding
+if SWEEP in ("drones", "comms", "density"):
+    pad = 0.4
+else:
+    rng = float(max(sweep_vals)) - float(min(sweep_vals))
+    pad = rng * 0.06 if rng > 0 else 0.05
+
+# for ax in (ax1, ax2):
+#     ax.set_xlim(min(x) - pad, max(x) + pad)
+
+# # Panel labels
+# for ax, lbl in zip((ax1, ax2), ("(a)", "(b)")):
+#     ax.text(-0.18, 1.02, lbl, transform=ax.transAxes,
+#             fontsize=10, fontweight="bold", va="top")
+# ── Fig (a): Fraction late ──────────────────────────────────────────────────
 for algo in algorithms:
     name, color, marker, ls = algo_style(algo)
     means, sems = late_data[algo]
@@ -339,27 +356,48 @@ for algo in algorithms:
     ax1.fill_between(x, means - sems, means + sems,
                      color=color, alpha=0.15, zorder=2)
 
-ax1.set_ylabel("Mean fraction of late packages")
+ax1.set_ylabel("Frac. late packages")
+ax1.set_xlabel(xlabel)
 ax1.set_ylim(bottom=0)
 ax1.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.2f"))
 ax1.grid(axis="y", linewidth=0.5, linestyle=":", color="0.85", zorder=0)
 ax1.grid(axis="x", linewidth=0.4, linestyle=":", color="0.90", zorder=0)
-ax1.legend(loc="best", frameon=True, handlelength=1.8)
+ax1.set_xticks(x)
+ax1.set_xticklabels(xtick_labels, rotation=0 if SWEEP in ("comms", "drones") else 0,
+                    ha="right" if SWEEP in ("comms", "drones") else "center")
+ax1.set_xlim(min(x) - pad, max(x) + pad)
+ax1.legend(ncol=2, frameon=True, handlelength=1.5,
+           columnspacing=0.8, handletextpad=0.4, loc="best")
+ax1.text(-0.20, 1.02, "(a)", transform=ax1.transAxes,
+         fontsize=10, fontweight="bold", va="top")
 
-# ── Panel (b): Computation time ───────────────────────────────────────────────
+fig1.savefig(os.path.join(output_dir, f"late_{fname_tag}_{fname_meta}.pdf"))
+fig1.savefig(os.path.join(output_dir, f"late_{fname_tag}_{fname_meta}.png"))
+plt.close(fig1)
+
+
+# ── Figure (b): Computation time  ────────────────────────────────────────
+fig2, ax2 = plt.subplots(figsize=(3.5, 3.5))
+
 for algo in time_algos:
     name, color, marker, ls = algo_style(algo)
     means, _ = time_data[algo]
     ax2.plot(x, means, color=color, marker=marker, markersize=5,
-             linewidth=1.4, linestyle=ls, zorder=3)
+             linewidth=1.4, linestyle=ls, label=name, zorder=3)
 
 ax2.set_yscale("log")
-ax2.set_ylabel("Avg. time per step (s)")
+ax2.set_ylabel("Comp. time (s)")
 ax2.set_xlabel(xlabel)
 ax2.set_xticks(x)
-ax2.set_xticklabels(xtick_labels, rotation=20 if SWEEP == "comms" else 0, ha="right" if SWEEP == "comms" else "center")
+ax2.set_xticklabels(xtick_labels, rotation=0 if SWEEP in ("comms", "drones") else 0,
+                    ha="right" if SWEEP in ("comms", "drones") else "center")
+ax2.set_xlim(min(x) - pad, max(x) + pad)
 ax2.grid(axis="y", linewidth=0.5, linestyle=":", color="0.85", zorder=0)
 ax2.grid(axis="x", linewidth=0.4, linestyle=":", color="0.90", zorder=0)
+# ax2.legend(ncol=2, frameon=True, handlelength=1.5,
+#            columnspacing=0.8, handletextpad=0.4, loc="best")
+ax2.text(-0.20, 1.02, "(b)", transform=ax2.transAxes,
+         fontsize=10, fontweight="bold", va="top")
 
 # Add footnote for comms sweep explaining omitted algorithms
 if comms_note:
@@ -373,24 +411,11 @@ if comms_note:
         fontsize=7.5, color="0.5", style="italic"
     )
 
-# x-axis padding
-if SWEEP in ("drones", "comms", "density"):
-    pad = 0.4
-else:
-    rng = float(max(sweep_vals)) - float(min(sweep_vals))
-    pad = rng * 0.06 if rng > 0 else 0.05
 
-for ax in (ax1, ax2):
-    ax.set_xlim(min(x) - pad, max(x) + pad)
 
-# Panel labels
-for ax, lbl in zip((ax1, ax2), ("(a)", "(b)")):
-    ax.text(-0.13, 1.02, lbl, transform=ax.transAxes,
-            fontsize=10, fontweight="bold", va="top")
+fig2.savefig(os.path.join(output_dir, f"time_{fname_tag}_{fname_meta}.pdf"))
+fig2.savefig(os.path.join(output_dir, f"time_{fname_tag}_{fname_meta}.png"))
+plt.close(fig2)
 
-# ── Save ──────────────────────────────────────────────────────────────────────
-fig_name = f"late_time_{fname_tag}_{fname_meta}.pdf"
-plt.savefig(os.path.join(output_dir, fig_name))
-plt.savefig(os.path.join(output_dir, fig_name.replace(".pdf", ".png")))
-plt.close(fig)
-print(f"Saved → {fig_name}")
+print(f"Saved → late_{fname_tag}_{fname_meta}.pdf")
+print(f"Saved → time_{fname_tag}_{fname_meta}.pdf")
