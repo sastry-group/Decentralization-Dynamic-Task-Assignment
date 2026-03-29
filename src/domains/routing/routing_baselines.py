@@ -14,8 +14,9 @@ from .travel_model import  sample_true_delivery_return_time, delivery_success_pr
 
 from domains.routing.mcts import RoutingMCTSMDP
 import logging
+import random
 
-
+random.seed(42)
 
 @dataclass
 class RoutingDroneState:
@@ -108,7 +109,7 @@ def expected_hungarian(server: RoutingAllocation, routing_sim: RoutingSimulator,
     elif depot_order == "desc":
         ordered_depots = sorted(depots.keys(), reverse=True)
     elif depot_order == "random":
-        ordered_depots = rng.sample(list(depots.keys()), len(depots))
+        ordered_depots = random.sample(list(depots.keys()), len(depots))
     else:
         ordered_depots = sorted(depots.keys())
 
@@ -285,132 +286,224 @@ def expected_hungarian(server: RoutingAllocation, routing_sim: RoutingSimulator,
                     })
 
 
-
 def earliest_due_date(server: RoutingAllocation, routing_sim: RoutingSimulator, rng: Any = None,
-                      csv_logger=None, trial_id=None, time_step=None, comms_dict=None, allow_overlap=False, depot_order="asc") -> None:
+                      csv_logger=None, trial_id=None, time_step=None, comms_dict=None,
+                      allow_overlap=False, depot_order="asc") -> None:
     """
-    Assign drones to earliest due packages within range.
+    Assign drones to earliest-due packages within range, with comms-aware
+    conflict avoidance that mirrors IBR's visibility logic exactly.
+
+    With full comms (comms_dict=None): depots see all other depots' claims
+    → no conflicts, same behaviour as before.
+
+    With reduced comms (comms_dict supplied): each depot only sees claims
+    made by drones in its comms neighbourhood → overlapping assignments
+    happen naturally, degrading performance as comms becomes sparser.
     """
-    # logging.info("Using EDD baseline for routing allocation.")
 
-    available_drones: Dict[int, List[str]] = {}
+    # ------------------------------------------------------------------ #
+    # 1. Group drones by depot — identical to IBR                         #
+    # ------------------------------------------------------------------ #
+    depots: Dict[int, List[str]] = {}
+    global_depos: Dict[int, List[str]] = {}
+    for dn, dp in server.agent_prop_set.items():
+        dnum = server.agent_set[dn].depot_number
+        if dp.at_depot:
+            depots.setdefault(dnum, []).append(dn)
+        global_depos.setdefault(dnum, []).append(dn)
 
-    
-    # group drones by depot
-    for drone_nm, dp in server.agent_prop_set.items():
-        drone = server.agent_set[drone_nm]
-        if dp.at_depot is True:
-            if drone.depot_number not in available_drones:
-                available_drones[drone.depot_number] = [drone_nm]
-            else:
-                available_drones[drone.depot_number].append(drone_nm)
+    if not any(depots.values()):
+        logging.info(f"[EDD] t={time_step} no drones at depot; skipping.")
+        return
 
-    all_assigned_pkgs: Set[str] = set()
-    # logging.info(f"Drones at depot information: {depots}")
+    # ------------------------------------------------------------------ #
+    # 2. Build comms neighbourhoods — identical to IBR                    #
+    # ------------------------------------------------------------------ #
+    all_depots_comm_net    = set(depots.keys())
+    global_depots_comm_net = set(global_depos.keys())
 
-
-    # Finding nearby packages
-    if depot_order == "random":
-        depot_numbers = list(available_drones.keys())
-        rng.shuffle(depot_numbers)
-        order = ((d, available_drones[d]) for d in depot_numbers)
-
-    elif depot_order == "desc":
-        depot_numbers = sorted(available_drones.keys(), reverse=True)
-        order = ((d, available_drones[d]) for d in depot_numbers)
-
+    if comms_dict is None:
+        # fully connected: each depot sees all others
+        depot_neighbors        = {d: set(all_depots_comm_net)    for d in all_depots_comm_net}
+        global_depots_neighbors = {d: set(global_depots_comm_net) for d in global_depots_comm_net}
     else:
-        order= available_drones.items()
+        depot_neighbors        = {d: {d} | set(comms_dict.get(d, [])) for d in all_depots_comm_net}
+        global_depots_neighbors = {d: {d} | set(comms_dict.get(d, [])) for d in global_depots_comm_net}
+        for d in comms_dict.keys():
+            depot_neighbors.setdefault(d,        {d} | set(comms_dict.get(d, [])))
+            global_depots_neighbors.setdefault(d, {d} | set(comms_dict.get(d, [])))
 
-    for depot_number, depot_drones in order:
-    # for depot_number, depot_drones in available_drones.items():
+    # ------------------------------------------------------------------ #
+    # 3. Visible drones per depot — identical to IBR                      #
+    # ------------------------------------------------------------------ #
+    visible_drones_by_depot: Dict[int, List[str]] = {}
+    global_visible_drones_by_depot: Dict[int, List[str]] = {}
 
-        # all the drones in this depot share the same depot location
-        depot_loc = server.agent_set[depot_drones[0]].depot_loc
+    for d in depot_neighbors:
+        vis = []
+        for nd in depot_neighbors[d]:
+            vis.extend(depots.get(nd, []))
+        visible_drones_by_depot[d] = vis
 
+    for d in global_depots_neighbors:
+        vis = []
+        for nd in global_depots_neighbors[d]:
+            vis.extend(global_depos.get(nd, []))
+        global_visible_drones_by_depot[d] = vis
+
+    # ------------------------------------------------------------------ #
+    # 4. Previously-seen packages per depot — identical to IBR            #
+    #    A depot can only block on packages claimed/won by drones it      #
+    #    can see through the comms graph.                                 #
+    # ------------------------------------------------------------------ #
+    previously_pkgs_visible_to_depot: Dict[int, Set[str]] = {d: set() for d in global_depos}
+    active_now = set(routing_sim.active_packages.keys())
+
+    for depot_num in global_depos:
+        visible_drones = set(global_visible_drones_by_depot.get(depot_num, []))
+        prev: Set[str] = set()
+
+        # packages claimed by a visible drone
+        for pkg, claimants in getattr(routing_sim, "package_claims", {}).items():
+            if pkg not in active_now:
+                continue
+            claimants = set(claimants) if not isinstance(claimants, set) else claimants
+            if claimants & visible_drones:
+                prev.add(pkg)
+
+        # packages whose winner is a visible drone
+        for pkg, winner_dn in getattr(routing_sim, "package_winners", {}).items():
+            if pkg in active_now and winner_dn in visible_drones:
+                prev.add(pkg)
+
+        previously_pkgs_visible_to_depot[depot_num] = prev
+
+    # ------------------------------------------------------------------ #
+    # 5. Depot ordering — identical to IBR                                #
+    # ------------------------------------------------------------------ #
+    if depot_order == "asc":
+        ordered_depots = sorted(depots.keys())
+    elif depot_order == "desc":
+        ordered_depots = sorted(depots.keys(), reverse=True)
+    elif depot_order == "random":
+        ordered_depots = random.sample(list(depots.keys()), len(depots))
+    else:
+        ordered_depots = sorted(depots.keys())
+
+    # tracks packages committed this round across depots
+    # (within-round deconfliction — same depot can't double-assign)
+    all_assigned_pkgs: Set[str] = set()
+
+    # ------------------------------------------------------------------ #
+    # 6. Per-depot greedy EDD assignment                                  #
+    # ------------------------------------------------------------------ #
+    for depot_number in ordered_depots:
+        depot_drones = depots[depot_number]
+        depot_loc    = server.agent_set[depot_drones[0]].depot_loc
+
+        # packages this depot can reach
         pkgs_in_range: Set[str] = set()
         for pkg_nm, pp in routing_sim.active_packages.items():
             dist = EuclideanLatLongMetric().evaluate(
                 convert_to_vector(depot_loc), convert_to_vector(pp.delivery)
             )
-            if dist <= routing_sim.distance_thresh:            
+            if dist <= routing_sim.distance_thresh:
                 pkgs_in_range.add(pkg_nm)
 
-        # assigning drones to packages
+        # what this depot considers "already taken" depends on comms
+        prev_blocked = previously_pkgs_visible_to_depot.get(depot_number, set())
+
         for drone_id in depot_drones:
+            # sort by earliest due date
+            server.agent_prop_set[drone_id].interaction_events.sort(
+                key=lambda ev: ev.timestamps[MODE.SUCCESS]
+            )
+
             ie_idx = None
-            #filtering interaction events based on in_range
-            server.agent_prop_set[drone_id].interaction_events.sort(key=lambda ev: ev.timestamps[MODE.SUCCESS])
             for idx, ie in enumerate(server.agent_prop_set[drone_id].interaction_events):
-                if (
-                    ie.task_name not in all_assigned_pkgs
-                    and ie.task_name in pkgs_in_range
-                    and ie.task_name not in routing_sim.busy_packages
-                ):
-                    ie_idx = idx
-                    break
+                pkg = ie.task_name
 
-            if ie_idx is not None:
-                pkg_nm = server.agent_prop_set[drone_id].interaction_events[ie_idx].task_name
-                # Assign the first valid package
-                if pkg_nm not in routing_sim.busy_packages:
-                    all_assigned_pkgs.add(pkg_nm)
+                # must be in range
+                if pkg not in pkgs_in_range:
+                    continue
 
-                    # server.agent_task_allocation[drone_id] = (pkg_nm, float('inf'))  # inf for now for true delivery, can be updated later
-                    # get the actual delivery time and return time
-                    window = routing_sim.active_packages[pkg_nm].time_window
-                    delivery_location = routing_sim.active_packages[pkg_nm].delivery
+                # must not be assigned already this round (within-round deconflict)
+                if pkg in all_assigned_pkgs:
+                    continue
 
+                if allow_overlap:
+                    # comms-aware: only block what this depot can see
+                    if pkg in prev_blocked:
+                        continue
+                else:
+                    # comms-aware block + globally busy
+                    if pkg in prev_blocked:
+                        continue
+                    if pkg in routing_sim.busy_packages:
+                        continue
 
-                    server.agent_prop_set[drone_id].current_package = pkg_nm
-                    server.agent_task_allocation[drone_id] = (pkg_nm, float("inf"))
-                    if allow_overlap:
-                        routing_sim.package_claims.setdefault(pkg_nm, set()).add(drone_id)
-                        routing_sim.package_registry[pkg_nm]["claimed_by"].append(drone_id)
-                        routing_sim.package_registry[pkg_nm]["time_assigned"].append(time_step)
-                        routing_sim.package_registry[pkg_nm]["winner"] = drone_id
-                        routing_sim.package_winners[pkg_nm] = drone_id
+                ie_idx = idx
+                break
 
-                    td, rt = sample_true_delivery_return_time(
-                        depot_loc,
-                        delivery_location,
-                        window,
-                        server.current_time,
-                        rng,
-                    )
-                    # Update sim state
-                    routing_sim.true_delivery_return[(drone_id, pkg_nm)] = (td, rt)
-                    server.agent_prop_set[drone_id].at_depot = False
-                    # routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages.pop(pkg_nm)
-                    # routing_sim.num_active_packages -= 1
+            if ie_idx is None:
+                logging.info(f"[EDD] depot {depot_number} drone {drone_id}: no package found.")
+                continue
 
+            pkg_nm = server.agent_prop_set[drone_id].interaction_events[ie_idx].task_name
 
-                    if allow_overlap:
-                        routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages[pkg_nm]
-                    else:
-                        routing_sim.busy_packages[pkg_nm] = routing_sim.active_packages.pop(pkg_nm)
-                        routing_sim.num_active_packages -= 1
-                
-                
-                    if csv_logger:
-                        csv_logger.log("drone_assignment.csv", {
-                            "trial": trial_id,
-                            "time": time_step,
-                            "drone_id": drone_id,
-                            "depot_number": depot_number,
-                            "pkg_id": pkg_nm,
-                            "pkg_earliest_time": server.agent_task_windows[(drone_id, pkg_nm)][0],
-                            "pkg_latest_time": server.agent_task_windows[(drone_id, pkg_nm)][1],
-                            "true_return_time": rt,
-                            "true_delivery_time": td,
-                            "approx_travel_time": routing_sim.busy_packages[pkg_nm].approx_travel_times.get(depot_number),
-                            "true_travel_time": rt-td
-                        })
+            # final busy check for allow_overlap=False
+            if not allow_overlap and pkg_nm in routing_sim.busy_packages:
+                logging.warning(f"[EDD] drone {drone_id} lost {pkg_nm} (race).")
+                continue
 
-                    logging.info(f"[Depot {depot_number}] Drone {drone_id} assigned package {pkg_nm}, package delivery time {td}, return time {rt}, package window (start, end, nominal) {server.agent_task_windows[(drone_id, pkg_nm)]}")
+            all_assigned_pkgs.add(pkg_nm)
 
-        
+            window            = routing_sim.active_packages[pkg_nm].time_window
+            delivery_location = routing_sim.active_packages[pkg_nm].delivery
+            server.agent_prop_set[drone_id].current_package = pkg_nm
+            server.agent_task_allocation[drone_id]          = (pkg_nm, float("inf"))
 
+            td, rt = sample_true_delivery_return_time(
+                depot_loc,
+                delivery_location,
+                window,
+                server.current_time,
+                rng,
+            )
+
+            routing_sim.true_delivery_return[(drone_id, pkg_nm)] = (td, rt)
+            server.agent_prop_set[drone_id].at_depot = False
+
+            if allow_overlap:
+                # register claim — mirrors IBR's overlap branch exactly
+                routing_sim.package_claims.setdefault(pkg_nm, set()).add(drone_id)
+                routing_sim.package_registry[pkg_nm]["claimed_by"].append(drone_id)
+                routing_sim.package_registry[pkg_nm]["time_assigned"].append(time_step)
+                routing_sim.package_winners[pkg_nm] = drone_id
+                routing_sim.busy_packages[pkg_nm]   = routing_sim.active_packages[pkg_nm]
+            else:
+                routing_sim.busy_packages[pkg_nm]   = routing_sim.active_packages.pop(pkg_nm)
+                routing_sim.num_active_packages     -= 1
+
+            if csv_logger:
+                csv_logger.log("drone_assignment.csv", {
+                    "trial":                  trial_id,
+                    "time":                   time_step,
+                    "drone_id":               drone_id,
+                    "depot_number":           depot_number,
+                    "pkg_id":                 pkg_nm,
+                    "pkg_earliest_time":      server.agent_task_windows[(drone_id, pkg_nm)][0],
+                    "pkg_latest_time":        server.agent_task_windows[(drone_id, pkg_nm)][1],
+                    "true_return_time":       rt,
+                    "true_delivery_time":     td,
+                    "approx_travel_time":     routing_sim.busy_packages[pkg_nm].approx_travel_times.get(depot_number),
+                    "true_travel_time":       rt - td,
+                })
+
+            logging.info(
+                f"[EDD] depot {depot_number} drone {drone_id} → pkg {pkg_nm} "
+                f"td={td} rt={rt} window={server.agent_task_windows[(drone_id, pkg_nm)]}"
+            )
 
 
 

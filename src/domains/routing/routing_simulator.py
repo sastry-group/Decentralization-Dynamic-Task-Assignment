@@ -25,41 +25,39 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
                              depots: dict[str,List[LatLonCoords]],
                              dist_thresh: float,
                              csv_logger=None) -> Package:
-    MIN_DIST = 1.0  # km (~300 m)
+    MAX_ATTEMPTS = 1000
 
-    # while True:
-    lat = lat_dist.rvs(random_state=rng)
-    lon = lon_dist.rvs(random_state=rng)
-    delivery = LatLonCoords(lat=lat, lon=lon)
+    # Rejection sampling: keep generating until point is
+    # within dist_thresh of at least one depot
+    for _ in range(MAX_ATTEMPTS):
+        lat = lat_dist.rvs(random_state=rng)
+        lon = lon_dist.rvs(random_state=rng)
+        delivery = LatLonCoords(lat=lat, lon=lon)
 
-    distance_dict = {}
+        distance_dict = {}
+        in_range = False
+        for depot_idx, depot in depots.items():
+            dist_km = EuclideanLatLongMetric().evaluate(depot.location, delivery)
+            distance_dict[depot_idx] = dist_km
+            if dist_km <= dist_thresh:
+                in_range = True
 
-    for depot_idx, depot in depots.items():
-        dist_km = EuclideanLatLongMetric().evaluate(depot.location, delivery)
-        distance_dict[depot_idx] = dist_km
-
-    # min_dist = min(distance_dict.values())
-
-        # accept if within desired ring around depots
-        # if MIN_DIST <= min_dist <= dist_thresh:
-        # if MIN_DIST <= min_dist:
-        #     break
+        if in_range:
+            break
+    else:
+        raise RuntimeError(
+            f"Could not place {pkg_name} within {dist_thresh} km of any depot "
+            f"after {MAX_ATTEMPTS} attempts. Consider expanding depot ranges "
+            f"or shrinking the sampling rectangle."
+        )
 
     approx_travel_times = {}
-
     for depot_idx, depot in depots.items():
-        # print("Calling from generate_package_request with depot", depot_idx, "and delivery", delivery)
         mu_tt = travel_time_mean_minutes(depot.location, delivery)
         approx_travel_times[depot_idx] = mu_tt
 
-    # Pick window length relative to nearest depot mean
-    # mu_nearest = min(approx_travel_times.values())
-    # k_low, k_high = 0.8, 1.4
-    # duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
-    # duration = round(rng.uniform(k_low * mu_nearest, k_high * mu_nearest))
     start = current_time + rng.uniform(tw_duration // 2, tw_duration)
-    duration = rng.uniform(tw_duration // 2, tw_duration)  # ensure window is at least half of tw_duration
-    # duration = max(start, approx_travel_times[min(approx_travel_times, key=approx_travel_times.get)] + 2) # safeguard
+    duration = rng.uniform(tw_duration // 2, tw_duration)
     window = (start, start + duration)
 
     pkg = Package(
@@ -69,9 +67,8 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
         approx_travel_times=approx_travel_times,
         distance_to_depots=distance_dict
     )
-
     if csv_logger:
-        csv_logger.log("pkg_gen_info.csv",{
+        csv_logger.log("pkg_gen_info.csv", {
             "pkg_id": pkg_name,
             "lat": lat, "lon": lon,
             "start": window[0], "end": window[1],
@@ -79,7 +76,6 @@ def generate_package_request(pkg_name, lat_dist: uniform, lon_dist: uniform,
             **{f"mu_depot_{i}": mu for i, mu in approx_travel_times.items()},
             **{f"dist_depot_{i}": dist for i, dist in distance_dict.items()}
         })
-
     return pkg
 
 

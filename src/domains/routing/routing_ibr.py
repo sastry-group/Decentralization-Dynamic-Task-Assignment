@@ -11,7 +11,7 @@ from domains.routing.routing_types import RoutingSimulator, EuclideanLatLongMetr
 from domains.routing.routing_simulator import sample_true_delivery_return_time, travel_time_mean_minutes
 from .travel_model import delivery_success_prob_ibr
 
-
+random.seed(42)
 
 
 # def create_comm_graph(depots: Dict[int, List[str]]) -> Dict[str, List[str]]:

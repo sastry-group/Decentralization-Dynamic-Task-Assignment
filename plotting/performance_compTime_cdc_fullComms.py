@@ -33,26 +33,56 @@ matplotlib.rcParams.update({
 })
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CONFIG — change SWEEP to switch between modes
+# CONFIG
 # ══════════════════════════════════════════════════════════════════════════════
-SWEEP = "drones"    # "prob"   → x-axis = new-request probability
+SWEEP = "density"     # "prob"   → x-axis = new-request probability
                     # "window" → x-axis = task window duration
                     # "drones" → x-axis = fleet configuration (dep, dr)
+                    # "comms"  → x-axis = communication graph structure
+                    # "density"   not all files will have this
 
-# Fixed values used when the other variables are held constant
-FIX_PROB = 0.5     # used when SWEEP = "window" or "drones"
-FIX_WIN  = 30       # used when SWEEP = "prob"   or "drones"
+# Fixed values used when other variables are held constant
+FIX_PROB = 0.5     # used when SWEEP = "window", "drones", or "comms"
+FIX_WIN  = 45       # used when SWEEP = "prob", "drones", or "comms"
 
-# Base directories for each sweep type
-BASE_DIRS = {
-    "prob":   "results/logs/4Paper_dr15_dp5_steps200_dynT_win30_v2",
-    "window": "results/logs/4Paper_dr15_dp5_steps200_dynT_varyWin",
-    "drones": "results/logs/4Paper_varyDroneNum",
+# For comms sweep: define the display order of your graph structure names.
+# Put them in order from least to most communication.
+# These must match exactly what appears in your folder names as comms_type.
+COMMS_ORDER = ["none", "brm_12", "brm_12_45", "star", "ring", "full"]   
+
+COMMS_LABELS = {
+    "none":      "None",
+    "brm_12":    "1-edge removed",
+    "brm_12_45": "2-edges removed",
+    "star":      "Star",
+    "ring":      "Ring",
+    "full":      "Full",
 }
+
+DENSITY_ORDER  = ["broad", "nominal", "narrow"]
+DENSITY_LABELS = {
+    "broad":   "Low",
+    "nominal": "Mid",
+    "narrow":  "High",
+}
+
+# Base directories
+BASE_DIRS = {
+    "prob":   "results/logs/4Paper_dr15_dp5_steps200_dynT_win30",
+    "window": "results/logs/4Paper_dr15_dp5_steps200_dynT_varyWin_v2",
+    "drones": "results/logs/4Paper_varyDroneNum",
+    "comms":  "results/logs/4Paper_commsGraphs_multiAlgo",   #
+    "density": "results/logs/4Paper_packageDensity"
+}
+
+# For comms sweep: algorithms whose compute time is NOT affected by comms
+# structure — these are omitted from the time panel to avoid flat clutter.
+# COMMS_SKIP_TIME = {"edd", "hungarian"}
+COMMS_SKIP_TIME = set()
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert SWEEP in ("prob", "window", "drones"), \
-    "SWEEP must be 'prob', 'window', or 'drones'"
+assert SWEEP in ("prob", "window", "drones", "comms", "density"), \
+    "SWEEP must be 'prob', 'window', 'drones', 'comms', or 'density'"
 
 # ── Algorithm styles ──────────────────────────────────────────────────────────
 ALGO_STYLE = {
@@ -80,14 +110,19 @@ pattern = re.compile(
     r"dr(?P<dr>\d+)_dep(?P<dep>\d+)_pkgnum(?P<pkg>\d+)_ntrials(?P<ntrials>\d+)_nsteps(?P<nsteps>\d+)_"
     r"probpt(?P<prob>\d+)_win(?P<win>\d+)_"
     r"(?P<algo>[^_]+)_"
-    r"comms-(?P<comms_radius>\d+)_"
-    r"(?P<comms_type>[^_]+)_"
+    r"comms-(?P<comms_raw>.+?)_"
     r"init-(?P<init>[^_]+)_"
-    r"dporder-(?P<dporder>.+)"
+    r"dporder-(?P<dporder>[^_]+)_"
+    r"overlap-(?P<overlap>[^_]+)_"
+    r"tasks-(?P<tasks>[^_]+)"
+    r"(?:_darr_(?P<darr>[^_]+))?"   # optional suffix
+    r"$"
 )
 
-base_dir     = BASE_DIRS[SWEEP]
-run_folders  = sorted(
+
+
+base_dir    = BASE_DIRS[SWEEP]
+run_folders = sorted(
     [p for p in glob.glob(os.path.join(base_dir, "*")) if os.path.isdir(p)]
 )
 
@@ -106,6 +141,9 @@ for folder_path in run_folders:
     meta["win"]  = int(meta["win"])
     meta["dr"]   = int(meta["dr"])
     meta["dep"]  = int(meta["dep"])
+    raw = meta.pop("comms_raw").strip("_")
+    meta["comms_type"] = re.sub(r'^\d+_', '', raw)
+
 
     with open(json_path) as f:
         r = json.load(f)
@@ -123,50 +161,97 @@ for folder_path in run_folders:
     records.append(meta)
 
 if not records:
-    raise ValueError(f"No valid experiment folders found in {base_dir}")
+    raise ValueError(f"No valid experiment folders found in:\n  {base_dir}")
 
 df = pd.DataFrame(records)
+# print("comms_type values found:", df["comms_type"].unique().tolist())
+# print("algo values found:", df["algo"].unique().tolist())
 
-# ── Filter to full comms only ─────────────────────────────────────────────────
-df_full = df[df["comms_type"] == "full"].copy()
-
-# ── Sweep-specific setup ──────────────────────────────────────────────────────
+# ── Sweep-specific filtering & axis setup ─────────────────────────────────────
 if SWEEP == "prob":
-    df_full      = df_full[df_full["win"] == FIX_WIN].copy()
-    sweep_vals   = sorted(df_full["prob"].unique())
+    df_plot      = df[df["win"] == FIX_WIN].copy()
+    sweep_vals   = sorted(df_plot["prob"].unique())
     sweep_col    = "prob"
-    xlabel       = "New request probability"
+    xlabel       = "New-request probability"
     xtick_labels = [f"{v:.2f}" for v in sweep_vals]
     fix_desc     = f"win={FIX_WIN} min"
     fname_tag    = f"prob_fixwin{FIX_WIN}"
+    # full comms only for non-comms sweeps
+    df_plot      = df_plot[df_plot["comms_type"] == "full"].copy()
 
 elif SWEEP == "window":
-    df_full      = df_full[np.isclose(df_full["prob"], FIX_PROB)].copy()
-    sweep_vals   = sorted(df_full["win"].unique())
+    df_plot      = df[np.isclose(df["prob"], FIX_PROB)].copy()
+    df_plot      = df_plot[df_plot["comms_type"] == "full"].copy()
+    sweep_vals   = sorted(df_plot["win"].unique())
     sweep_col    = "win"
     xlabel       = "Task window duration (min)"
     xtick_labels = [str(v) for v in sweep_vals]
     fix_desc     = f"p={FIX_PROB}"
     fname_tag    = f"win_fixprob{FIX_PROB}"
 
-else:  # "drones"
-    df_full = df_full[
-        np.isclose(df_full["prob"], FIX_PROB) &
-        (df_full["win"] == FIX_WIN)
+elif SWEEP == "drones":
+    df_plot = df[
+        np.isclose(df["prob"], FIX_PROB) &
+        (df["win"] == FIX_WIN) &
+        (df["comms_type"] == "full")
     ].copy()
-
-    # Build a sortable fleet config key: sort by (dep, dr) ascending
-    df_full["fleet"] = list(zip(df_full["dep"], df_full["dr"]))
-    fleet_configs    = sorted(df_full["fleet"].unique())   # e.g. [(5,15),(5,50),(10,100)]
-
-    sweep_vals   = list(range(len(fleet_configs)))         # integer positions for x-axis
-    sweep_col    = "fleet"
+    df_plot["fleet_key"] = (
+        df_plot["dep"].astype(str) + "_" + df_plot["dr"].astype(str)
+    )
+    fleet_configs = sorted(
+        df_plot[["dep", "dr"]].drop_duplicates().itertuples(index=False),
+        key=lambda row: (row.dep, row.dr)
+    )
+    sweep_vals   = [f"{r.dep}_{r.dr}" for r in fleet_configs]
+    sweep_col    = "fleet_key"
     xlabel       = "Fleet configuration"
-    xtick_labels = [f"{dep}dep·{dr}dr" for dep, dr in fleet_configs]
+    xtick_labels = [f"{r.dep}dep·{r.dr}dr" for r in fleet_configs]
     fix_desc     = f"p={FIX_PROB}, win={FIX_WIN} min"
     fname_tag    = f"drones_fixprob{FIX_PROB}_win{FIX_WIN}"
 
-algorithms = sorted(df_full["algo"].unique())
+elif SWEEP == "density":
+    df_plot = df[
+        np.isclose(df["prob"], FIX_PROB) &
+        (df["win"] == FIX_WIN) &
+        (df["comms_type"] == "full")
+    ].copy()
+    found_darr = set(df_plot["darr"].unique())
+    sweep_vals  = [d for d in DENSITY_ORDER if d in found_darr]
+    unlisted    = found_darr - set(DENSITY_ORDER)
+    if unlisted:
+        print(f"WARNING: darr values in data not in DENSITY_ORDER: {unlisted}")
+    sweep_col    = "darr"
+    xlabel       = "Spatial conflict level"
+    xtick_labels = [DENSITY_LABELS.get(v, v) for v in sweep_vals]
+    fix_desc     = f"p={FIX_PROB}, win={FIX_WIN} min"
+    fname_tag    = f"density_fixprob{FIX_PROB}_win{FIX_WIN}"
+
+
+else:  # "comms"
+    df_plot = df[
+        np.isclose(df["prob"], FIX_PROB) &
+        (df["win"] == FIX_WIN)
+    ].copy()
+
+    # Use COMMS_ORDER to define x-axis ordering; drop any levels not in data
+    found_comms  = set(df_plot["comms_type"].unique())
+    sweep_vals   = [c for c in COMMS_ORDER if c in found_comms]
+
+    # Warn about any comms levels in data that weren't listed in COMMS_ORDER
+    unlisted = found_comms - set(COMMS_ORDER)
+    if unlisted:
+        print(f"WARNING: these comms_type values are in your data but not in "
+              f"COMMS_ORDER and will be skipped: {unlisted}")
+        print(f"  → Add them to COMMS_ORDER in the config section.")
+
+    sweep_col    = "comms_type"
+    xlabel       = "Communication graph structure"
+    # xtick_labels = sweep_vals          # use the names as-is for tick labels
+    xtick_labels = [COMMS_LABELS.get(c, c) for c in sweep_vals]
+    fix_desc     = f"p={FIX_PROB}, win={FIX_WIN} min"
+    fname_tag    = f"comms_fixprob{FIX_PROB}_win{FIX_WIN}"
+
+algorithms = sorted(df_plot["algo"].unique())
 
 print(f"Sweep mode  : {SWEEP}")
 print(f"Fixed       : {fix_desc}")
@@ -175,52 +260,54 @@ print(f"Algorithms  : {algorithms}")
 
 if len(sweep_vals) == 0:
     raise ValueError(
-        f"No data after filtering. Check FIX_PROB={FIX_PROB} and "
-        f"FIX_WIN={FIX_WIN} match your folder names."
+        "No sweep values found after filtering. Check:\n"
+        f"  FIX_PROB={FIX_PROB}, FIX_WIN={FIX_WIN}\n"
+        f"  COMMS_ORDER={COMMS_ORDER}\n"
+        f"  Actual comms_type values in data: {df['comms_type'].unique().tolist()}"
     )
 
 # ── Collect means & SEMs ──────────────────────────────────────────────────────
-def collect(metric_mean, metric_sem=None):
+def collect(metric_mean, metric_sem=None, algo_subset=None):
+    algos = algo_subset if algo_subset else algorithms
     out = {}
-    for algo in algorithms:
+    for algo in algos:
         means, sems = [], []
-
-        if SWEEP == "drones":
-            for fc in fleet_configs:
-                rows = df_full[
-                    (df_full["algo"] == algo) &
-                    (df_full["fleet"] == fc)
+        for v in sweep_vals:
+            if SWEEP == "drones":
+                rows = df_plot[
+                    (df_plot["algo"] == algo) &
+                    (df_plot[sweep_col] == v)
                 ]
-                if len(rows) == 0:
-                    means.append(np.nan)
-                    sems.append(np.nan)
-                else:
-                    means.append(rows[metric_mean].mean())
-                    sems.append(rows[metric_sem].mean() if metric_sem else 0.0)
-        else:
-            for v in sweep_vals:
-                rows = df_full[
-                    (df_full["algo"] == algo) &
-                    (np.isclose(df_full[sweep_col], v))
+            else:
+                rows = df_plot[
+                    (df_plot["algo"] == algo) &
+                    (np.isclose(df_plot[sweep_col].astype(float), float(v))
+                     if sweep_col not in ("comms_type", "fleet_key", "darr")
+                     else df_plot[sweep_col] == v)
                 ]
-                if len(rows) == 0:
-                    means.append(np.nan)
-                    sems.append(np.nan)
-                else:
-                    means.append(rows[metric_mean].mean())
-                    sems.append(rows[metric_sem].mean() if metric_sem else 0.0)
-
+            if len(rows) == 0:
+                means.append(np.nan)
+                sems.append(np.nan)
+            else:
+                means.append(rows[metric_mean].mean())
+                sems.append(rows[metric_sem].mean() if metric_sem else 0.0)
         out[algo] = (np.array(means), np.array(sems))
     return out
 
 late_data = collect("mean_late", "sem_late")
-time_data = collect("time")
+
+# For comms sweep: compute time only for algorithms that actually change
+if SWEEP == "comms":
+    time_algos = [a for a in algorithms if a.lower() not in COMMS_SKIP_TIME]
+else:
+    time_algos = algorithms
+
+time_data = collect("time", algo_subset=time_algos)
 
 # ── Metadata for filename ─────────────────────────────────────────────────────
 ntrials = df["ntrials"].iloc[0]
 pkg     = df["pkg"].iloc[0]
 
-# For drones sweep, dr/dep vary so don't embed them in the filename
 if SWEEP == "drones":
     fname_meta = f"pkg{pkg}_ntrials{ntrials}"
 else:
@@ -228,7 +315,12 @@ else:
     dep = df["dep"].iloc[0]
     fname_meta = f"dr{dr}_dep{dep}_pkg{pkg}_ntrials{ntrials}"
 
-# ── Figure ────────────────────────────────────────────────────────────────────
+# ── Figure layout ─────────────────────────────────────────────────────────────
+# Comms sweep gets a note under the time panel explaining the omission
+comms_note = (
+    SWEEP == "comms" and len(COMMS_SKIP_TIME & {a.lower() for a in algorithms}) > 0
+)
+
 fig, (ax1, ax2) = plt.subplots(
     2, 1,
     figsize=(4.5, 5.0),
@@ -236,9 +328,9 @@ fig, (ax1, ax2) = plt.subplots(
     gridspec_kw={"height_ratios": [1, 0.85], "hspace": 0.08}
 )
 
-x = np.array(sweep_vals)
+x = np.arange(len(sweep_vals)) if SWEEP in ("drones", "comms", "density") else np.array(sweep_vals, dtype=float)
 
-# ── Row 1: Fraction late ──────────────────────────────────────────────────────
+# ── Panel (a): Fraction late ──────────────────────────────────────────────────
 for algo in algorithms:
     name, color, marker, ls = algo_style(algo)
     means, sems = late_data[algo]
@@ -251,10 +343,11 @@ ax1.set_ylabel("Mean fraction of late packages")
 ax1.set_ylim(bottom=0)
 ax1.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.2f"))
 ax1.grid(axis="y", linewidth=0.5, linestyle=":", color="0.85", zorder=0)
+ax1.grid(axis="x", linewidth=0.4, linestyle=":", color="0.90", zorder=0)
 ax1.legend(loc="best", frameon=True, handlelength=1.8)
 
-# ── Row 2: Computation time (log scale) ──────────────────────────────────────
-for algo in algorithms:
+# ── Panel (b): Computation time ───────────────────────────────────────────────
+for algo in time_algos:
     name, color, marker, ls = algo_style(algo)
     means, _ = time_data[algo]
     ax2.plot(x, means, color=color, marker=marker, markersize=5,
@@ -264,18 +357,30 @@ ax2.set_yscale("log")
 ax2.set_ylabel("Avg. time per step (s)")
 ax2.set_xlabel(xlabel)
 ax2.set_xticks(x)
-ax2.set_xticklabels(xtick_labels)
+ax2.set_xticklabels(xtick_labels, rotation=20 if SWEEP == "comms" else 0, ha="right" if SWEEP == "comms" else "center")
 ax2.grid(axis="y", linewidth=0.5, linestyle=":", color="0.85", zorder=0)
+ax2.grid(axis="x", linewidth=0.4, linestyle=":", color="0.90", zorder=0)
 
-# x padding — categorical (drones) gets fixed gap, continuous gets 5% of range
-if SWEEP == "drones":
+# Add footnote for comms sweep explaining omitted algorithms
+if comms_note:
+    skipped = ", ".join(
+        ALGO_STYLE[a][0] if a in ALGO_STYLE else a.upper()
+        for a in sorted(COMMS_SKIP_TIME & {a.lower() for a in algorithms})
+    )
+    ax2.annotate(
+        f"† {skipped} omitted — compute cost independent of comms structure",
+        xy=(0.01, -0.28), xycoords="axes fraction",
+        fontsize=7.5, color="0.5", style="italic"
+    )
+
+# x-axis padding
+if SWEEP in ("drones", "comms", "density"):
     pad = 0.4
 else:
-    rng = max(sweep_vals) - min(sweep_vals)
+    rng = float(max(sweep_vals)) - float(min(sweep_vals))
     pad = rng * 0.06 if rng > 0 else 0.05
 
 for ax in (ax1, ax2):
-    ax.grid(axis="x", linewidth=0.4, linestyle=":", color="0.90", zorder=0)
     ax.set_xlim(min(x) - pad, max(x) + pad)
 
 # Panel labels
