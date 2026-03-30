@@ -20,17 +20,19 @@ SCRIPT="${SCRIPT_DIR}/scripts/benchmark_routing.py"
 
 # ── Fixed parameters ──────────────────────────────────────────
 TRIALS=100
-TIMESTEPS=150
+TIMESTEPS=200
 N_DRONES=15
 N_DEPOTS=5
 NEW_REQ_PROB=0.5
-TIME_WINDOW=30
+TIME_WINDOW=45
 INIT_METHOD="empty"
 
 # ── Sweep axes (edit these lists) ─────────────────────────────
-ALGOS=("edd" "hungarian" "ibr")
-DEPOT_ORDERS=("asc" "desc" "random")
-COMMS_MODES=("full" "none")
+# ALGOS=("edd" "hungarian" "ibr")
+ALGOS=("ibr")
+# DEPOT_ORDERS=("asc" "desc" "random")
+DEPOT_ORDERS=("random")
+COMMS_MODES=("full" "rm_12" "rm_12_31" "rm_12_31_43"  "none")
 
 # ── Output directory ──────────────────────────────────────────
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -76,6 +78,7 @@ for ALGO in "${ALGOS[@]}"; do
         --new_request_prob "${NEW_REQ_PROB}" \
         --time_window  "${TIME_WINDOW}" \
         --baseline     "${ALGO}" \
+        --num-init-requests "100" \
         --dynamic_tasks \
         --init_method  "${INIT_METHOD}" \
         --depot-order  "${DEPOT}" \
