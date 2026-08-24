@@ -43,40 +43,69 @@ random.seed(42)
 #     return reward * sum(best_by_pkg.values())
 
 
-
 def group_welfare(assignments, group, p_cache, reward):
-    best_by_pkg = {}
+    # W(x) = sum_t v_t * (1 - prod_{i assigned to t} (1 - p_i))   [Eq. (3)]
+    fail_by_pkg = {}
     for dn in group:
         pkg = assignments.get(dn)
         if pkg is None:
             continue
         p = p_cache.get((dn, pkg), 0.0)
-        if (pkg not in best_by_pkg) or (p > best_by_pkg[pkg]):
-            best_by_pkg[pkg] = p
-        # print(f"Drone {dn} assigned to pkg {pkg} with p={p:.2f}")
+        fail_by_pkg[pkg] = fail_by_pkg.get(pkg, 1.0) * (1.0 - p)
+
+
+    return reward * sum(1.0 - f for f in fail_by_pkg.values())
+
+
+# def group_welfare_old(assignments, group, p_cache, reward):
+#     best_by_pkg = {}
+#     for dn in group:
+#         pkg = assignments.get(dn)
+#         if pkg is None:
+#             continue
+#         p = p_cache.get((dn, pkg), 0.0)
+#         if (pkg not in best_by_pkg) or (p > best_by_pkg[pkg]):
+#             best_by_pkg[pkg] = p
+#         # print(f"Drone {dn} assigned to pkg {pkg} with p={p:.2f}")
     
-    return reward * sum(best_by_pkg.values())
+#     return reward * sum(best_by_pkg.values())
 
 def compute_utility(pkg, agent, assigned, group, p_cache, reward):
-    # print(f"Computing utility for agent {agent} considering pkg {pkg} and group {group}")
-    # baseline: agent idle
-    base = dict(assigned)
-    base[agent] = None
-    w0 = group_welfare(base, group, p_cache, reward)
-
-    # candidate: agent chooses pkg
-    cand = dict(assigned)
-    cand[agent] = pkg
-    w1 = group_welfare(cand, group, p_cache, reward)
-    # print(f"Utility if idle: {w0:.2f}, Utility if take pkg: {w1:.2f}")
-
+    base = dict(assigned); base[agent] = None
+    cand = dict(assigned); cand[agent] = pkg
+    w0, w1 = group_welfare(base, group, p_cache, reward), group_welfare(cand, group, p_cache, reward)
+    # others = [d for d in group if d != agent and assigned.get(d) == pkg]
+    # if others:
+    #     o0 = group_welfare_old(base, group, p_cache, reward)
+    #     o1 = group_welfare_old(cand, group, p_cache, reward)
+    #     print(f"[Wi] a={agent} k={pkg} p_i={p_cache.get((agent,pkg),0.0):.3f} "
+    #           f"p_incumbent={[round(p_cache.get((d,pkg),0.0),3) for d in others]} || "
+    #           f"Eq3: W0={w0:.1f} W1={w1:.1f} U={w1-w0:.1f} || "
+    #           f"max: W0={o0:.1f} W1={o1:.1f} U={o1-o0:.1f}", flush=True)
     return w1 - w0
 
+# DUP_HITS = Counter()
 
+# def compute_utility(pkg, agent, assigned, group, p_cache, reward):
+#     base = dict(assigned); base[agent] = None
+#     cand = dict(assigned); cand[agent] = pkg
+#     w0 = group_welfare(base, group, p_cache, reward)
+#     w1 = group_welfare(cand, group, p_cache, reward)
+
+#     others = [d for d in group if d != agent and assigned.get(d) == pkg]
+#     if others:
+#         u_old = (group_welfare_old(cand, group, p_cache, reward)
+#                  - group_welfare_old(base, group, p_cache, reward))
+#         DUP_HITS["dup"] += 1
+#         print(f"[Wi] a={agent} k={pkg} p_i={p_cache.get((agent,pkg),0.0):.3f} "
+#               f"G_k={[(d, round(p_cache.get((d,pkg),0.0),3)) for d in others]} "
+#               f"Wi_idle={w0:.2f} Wi_k={w1:.2f} U_new={w1-w0:.2f} U_old={u_old:.2f}",
+#               flush=True)
+#     return w1 - w0
 
 
 def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimulator, rng=None, csv_logger=None,
-                            init_method = "greedy", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False, 
+                            init_method = "empty", trial_id=None, time_step=None, comms_dict=None, allow_overlap=False, 
                             depot_order="asc"):
 
 
@@ -394,10 +423,21 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
 
         rounds_completed += 1
 
+
+
         if changes_this_round == 0:
             break
         
-
+    # ## DELETE
+    # n_cands = len({ie.task_name for dn in all_considered_drones
+    #             for ie in interaction_events_by_drone.get(dn, [])})
+    # pvals = [v for v in p_cache.values() if v > 0]
+    # print(f"[SLACK] t={time_step} at_depot={len(all_considered_drones)} cands={n_cands} "
+    #       f"rounds={rounds_completed} dup_evals={DUP_HITS['dup']} "
+    #       f"idle={sum(1 for dn in all_considered_drones if assigned.get(dn) is None)} "
+    #       f"p_pos={len(pvals)}/{len(p_cache)} p_max={max(pvals, default=0.0):.3f}",
+    #       flush=True)
+    # DUP_HITS.clear()
     
 
     csv_logger.log("computational_efficiency_metrics.csv", {
@@ -506,3 +546,4 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
                     "approx_travel_time": routing_sim.active_packages[pkg].approx_travel_times.get(server.agent_set[dn].depot_number),
                     "true_travel_time": rt - td
                 })
+
