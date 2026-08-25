@@ -35,7 +35,7 @@ matplotlib.rcParams.update({
 # ══════════════════════════════════════════════════════════════════════════════
 # CONFIG
 # ══════════════════════════════════════════════════════════════════════════════
-SWEEP = "drones"     # "prob"   → x-axis = new-request probability
+SWEEP = "prob"     # "prob"   → x-axis = new-request probability
                     # "window" → x-axis = task window duration
                     # "drones" → x-axis = fleet configuration (dep, dr)
                     # "comms"  → x-axis = communication graph structure
@@ -329,7 +329,7 @@ comms_note = (
 #     gridspec_kw={"height_ratios": [1, 0.75], "hspace": 0.10}
 # )
 # fig.subplots_adjust(bottom=0.15)
-fig1, ax1 = plt.subplots(figsize=(3.5, 3.5))
+fig1, ax1 = plt.subplots(figsize=(3.5, 2.5))
 
 x = np.arange(len(sweep_vals)) if SWEEP in ("drones", "comms", "density") else np.array(sweep_vals, dtype=float)
 
@@ -372,13 +372,13 @@ ax1.legend(ncol=2, frameon=True, handlelength=1.5,
 ax1.text(-0.20, 1.02, "(a)", transform=ax1.transAxes,
          fontsize=10, fontweight="bold", va="top")
 
-fig1.savefig(os.path.join(output_dir, f"late_{fname_tag}_{fname_meta}.pdf"))
-fig1.savefig(os.path.join(output_dir, f"late_{fname_tag}_{fname_meta}.png"))
+fig1.savefig(os.path.join(output_dir, f"late_{fname_tag}_{fname_meta}_short.pdf"))
+fig1.savefig(os.path.join(output_dir, f"late_{fname_tag}_{fname_meta}_short.png"))
 plt.close(fig1)
 
 
 # ── Figure (b): Computation time  ────────────────────────────────────────
-fig2, ax2 = plt.subplots(figsize=(3.5, 3.5))
+fig2, ax2 = plt.subplots(figsize=(3.5, 2.5))
 
 for algo in time_algos:
     name, color, marker, ls = algo_style(algo)
@@ -414,9 +414,9 @@ if comms_note:
 
 
 
-fig2.savefig(os.path.join(output_dir, f"time_{fname_tag}_{fname_meta}.pdf"))
-fig2.savefig(os.path.join(output_dir, f"time_{fname_tag}_{fname_meta}.png"))
+fig2.savefig(os.path.join(output_dir, f"time_{fname_tag}_{fname_meta}_short.pdf"))
+fig2.savefig(os.path.join(output_dir, f"time_{fname_tag}_{fname_meta}_short.png"))
 plt.close(fig2)
 
-print(f"Saved → late_{fname_tag}_{fname_meta}.pdf")
-print(f"Saved → time_{fname_tag}_{fname_meta}.pdf")
+print(f"Saved → late_{fname_tag}_{fname_meta}_short.pdf")
+print(f"Saved → time_{fname_tag}_{fname_meta}._shortpdf")

@@ -8,11 +8,11 @@ SCRIPT="${SCRIPT_DIR}/scripts/benchmark_routing.py"
 # ── Fixed parameters ──────────────────────────────────────────
 TRIALS=100
 TIMESTEPS=200
-N_DRONES=50
+N_DRONES=15
 N_DEPOTS=5
 INIT_METHOD="empty"
-NUM_INIT_REQUESTS=75
-PKG_DENSITY="nominal"
+NUM_INIT_REQUESTS=100
+PKG_DENSITY="narrow"
 
 # ── Sweep axes (edit these lists) ─────────────────────────────
 # ALGOS=("edd" "hungarian" "ibr" "scoba")
@@ -24,7 +24,7 @@ COMMS_MODES=("full" "rm_12_31_43" "none" "rm_12_31" "rm_12")
 # REQ_PROBS=(0.5 0.75 1.0)
 REQ_PROBS=(0.5)
 # TIME_WINDOWS=(15 30 45)
-TIME_WINDOWS=(30)
+TIME_WINDOWS=(45)
 
 # ── Output directory ──────────────────────────────────────────
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")

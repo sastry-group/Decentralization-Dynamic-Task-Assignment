@@ -39,24 +39,24 @@ matplotlib.rcParams.update({
 FIX_PROB = 0.5
 FIX_WIN  = 30
 
-# BASE_DIR   = "results/logs/4Paper_pareto"
-BASE_DIR = "results/logs/4Paper_commsGraphs_multiAlgo"
+BASE_DIR   = "results/logs/4Paper_pareto"
+# BASE_DIR = "results/logs/4Paper_commsGraphs_multiAlgo"
 OUTPUT_DIR = "results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Ordered least → most communication
-COMMS_ORDER = ["none", "star", "ring", "brm_12_45", "brm_12", "full"]
-# COMMS_ORDER = ["none", "rm_12_31_43", "rm_12_31","rm_12","full"]
+# COMMS_ORDER = ["none", "star", "ring", "brm_12_45", "brm_12", "full"]
+COMMS_ORDER = ["none", "rm_12_31_43", "rm_12_31","rm_12","full"]
 
 COMMS_LABELS = {
-    # "none":      "$\\gamma(G)=5$\n(No-comms)",
-    "none":      "No-comms",
+    "none":      "$\\gamma(G)=5$\n(No-comms)",
+    # "none":      "No-comms",
     "brm_12":    "1-edge\nremoved",
     "brm_12_45": "2-edges\nremoved",
     "star":      "Star",
     "ring":      "Ring",
-    # "full":      "$\\gamma(G)=1$\n(Full-comms)",
-    "full":      "Full-comms",
+    "full":      "$\\gamma(G)=1$\n(Full-comms)",
+    # "full":      "Full-comms",
     "rm_12":       "$\\gamma(G)=2$",
     "rm_12_31":    "$\\gamma(G)=3$",
     "rm_12_31_43": "$\\gamma(G)=4$",
@@ -180,7 +180,7 @@ offsets = algo_offsets(n_algos)
 # ══════════════════════════════════════════════════════════════════════════════
 # Figure (a): Boxplot — fraction late
 # ══════════════════════════════════════════════════════════════════════════════
-fig1, ax1 = plt.subplots(figsize=(7.0, 3.8))
+fig1, ax1 = plt.subplots(figsize=(7.0, 3.1))
 
 for a_idx, algo in enumerate(algorithms):
     name, color, marker = algo_style(algo)
@@ -232,8 +232,8 @@ ax1.legend(ncol=4, frameon=True, handlelength=1.0,
 # ax1.text(-0.11, 1.02, "(a)", transform=ax1.transAxes,
 #          fontsize=11, fontweight="bold", va="top")
 
-fig1.savefig(os.path.join(OUTPUT_DIR, f"box_late_comms_{fname_meta}_undir.pdf"))
-fig1.savefig(os.path.join(OUTPUT_DIR, f"box_late_comms_{fname_meta}_undir.png"))
+fig1.savefig(os.path.join(OUTPUT_DIR, f"box_late_comms_{fname_meta}_dir_short.pdf"))
+fig1.savefig(os.path.join(OUTPUT_DIR, f"box_late_comms_{fname_meta}_dir_short.png"))
 plt.close(fig1)
 print(f"Saved → box_late_comms_{fname_meta}.pdf")
 

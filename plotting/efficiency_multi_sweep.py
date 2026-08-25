@@ -166,7 +166,7 @@ print(f"Win values:  {sorted(df_algo['win'].unique())}")
 print(f"Fleet:       {sorted(df_algo[['dep','dr']].drop_duplicates().values.tolist())}")
 
 # ── Plot ──────────────────────────────────────────────────────────────────────
-fig, ax = plt.subplots(figsize=(5.5, 3.0))
+fig, ax = plt.subplots(figsize=(5.0, 2.0))
 
 any_plotted = False
 
@@ -243,7 +243,7 @@ if SHOW_VUG_BOUNDS:
 # ── Formatting ────────────────────────────────────────────────────────────────
 ax.set_xlabel(r"Information group number $\gamma(G)$")
 ax.set_ylabel("Efficiency ratio")
-# ax.set_ylim(0, 1.08)
+ax.set_ylim(0.85, 1.02)
 
 # Set x-ticks to integer τ values found across all configs
 all_taus = sorted(df_algo["tau"].dropna().unique())
