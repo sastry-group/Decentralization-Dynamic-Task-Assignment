@@ -352,7 +352,8 @@ def iterative_best_response(server: RoutingAllocation, routing_sim: RoutingSimul
 
     for r in range(1, k_rounds + 1):
         changes_this_round = 0
-
+        rng.shuffle(all_considered_drones)
+        # print(f"Iterations {r}, {all_considered_drones}")
         for drone in all_considered_drones:
 
             if not server.agent_prop_set[drone].at_depot:

@@ -70,6 +70,12 @@ PARAMS_BY_DEPOTS = {
     10: str(PARAM_FILES / "sf_bb_params_10dpts.toml"),
 }
 
+# (n_depots, density) -> params file. Only non-nominal densities go here.
+PARAMS_BY_DEPOTS_DENSITY = {
+    (5, "narrow"): str(PARAM_FILES / "sf_bb_params_narrow.toml"),
+    (5, "broad"):  str(PARAM_FILES / "sf_bb_params_broad.toml"),
+}
+
 DEPOT_COORDS = [
     (37.774524, -122.473656),
     (37.751751, -122.410654),
@@ -79,6 +85,23 @@ DEPOT_COORDS = [
 ]
 
 
+def resolve_params_file(n_depots: int, density: str) -> str:
+    """Pick the TOML params file for this depot count and package density."""
+    if density != "nominal":
+        key = (n_depots, density)
+        if key not in PARAMS_BY_DEPOTS_DENSITY:
+            raise ValueError(
+                f"No '{density}' params file for n_depots={n_depots}. "
+                f"Available: {sorted(PARAMS_BY_DEPOTS_DENSITY)}. "
+                f"Use --params-file to override."
+            )
+        return PARAMS_BY_DEPOTS_DENSITY[key]
+
+    if n_depots not in PARAMS_BY_DEPOTS:
+        raise ValueError(
+            f"No default params file for n_depots={n_depots}. Use --params-file to override."
+        )
+    return PARAMS_BY_DEPOTS[n_depots]
 
 def parse_city_params(toml_path: str):
     with open(toml_path, 'rb') as f:
@@ -190,6 +213,7 @@ def parse_commandline():
     p.add_argument("--comms_mode", type=str, default="full")        
     p.add_argument("--depot-order", type=str, default="asc",
                 choices=["asc", "desc", "random"])
+    p.add_argument("--package-density", choices=["nominal", "broad", "narrow"], default="nominal")
     p.add_argument("--plot-comms", action="store_true")
     p.add_argument("--plot-init", action="store_true")
     # logging verbosity
@@ -227,6 +251,13 @@ def main():
     comms_tag = args["comms_mode"]
     init_tag  = args["init_method"]
     order_tag = args["depot_order"]
+    package_density_tag = args["package_density"]
+
+    # choose params file
+    if args["params_file"] is not None:
+        params_fn = args["params_file"]
+    else:
+        params_fn = resolve_params_file(args["n_depots"], package_density_tag)
 
     num_init = args["num_init_requests"]
     if num_init is None:
@@ -247,7 +278,7 @@ def main():
         f"_dporder-{order_tag}"
         f"_overlap-{overlap}"
         f"_tasks-{dynamic_tasks}"
-        # f"_darr_narrow"
+        f"_darr_{package_density_tag}"
     )
     out_dir = ROOT / "results" / "logs" / log_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -269,12 +300,12 @@ def main():
     logging.info(f"comms_metrics={metrics_d}")
     print(
         f"  Comms graph: mode={comms_tag}  n_depots={args['n_depots']}\n"
-        f"    τ(G)={comms_metrics.tau}  "
-        f"α*(Ḡ)={comms_metrics.alpha_star_recip:.2f}  "
-        f"α(Ḡ)={comms_metrics.alpha_recip}\n"
-        f"    PoA bounds:  general ≥ {comms_metrics.poa_lb_general:.4f}  "
-        f"consistent ≥ {comms_metrics.poa_lb_consistent:.4f}  "
-        f"upper ≤ {comms_metrics.poa_ub:.4f}"
+        f"    tau(G)={comms_metrics.tau}  "
+        f"alpha*(G_bar)={comms_metrics.alpha_star_recip:.2f}  "
+        f"alpha(G_bar)={comms_metrics.alpha_recip}\n"
+        f"    PoA bounds:  general >={comms_metrics.poa_lb_general:.4f}  "
+        f"consistent >= {comms_metrics.poa_lb_consistent:.4f}  "
+        f"upper <= {comms_metrics.poa_ub:.4f}"
     )
     # travel-time estimates
     arrs = np.load(str(TRAVELTIME_EST))
@@ -379,7 +410,7 @@ def main():
         
         timing_per_timestep = [] 
         for t in range(args['timesteps']):
-            # print("time ", t)
+            print("time ", t)
             # logging.info(f"--- [t={t}] BEGIN TIMESTEP --- current_time = {sim.current_time}")
             update_time_windows(sim, server, csv_logger=csv_logger)
             if sim.active_packages:

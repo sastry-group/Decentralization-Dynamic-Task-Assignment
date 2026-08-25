@@ -75,6 +75,7 @@ BASE_DIRS = {
     "density": "results/logs/4Paper_packageDensity"
 }
 
+
 # For comms sweep: algorithms whose compute time is NOT affected by comms
 # structure — these are omitted from the time panel to avoid flat clutter.
 # COMMS_SKIP_TIME = {"edd", "hungarian"}

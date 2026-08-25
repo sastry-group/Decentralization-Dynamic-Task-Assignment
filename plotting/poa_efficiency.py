@@ -234,7 +234,7 @@ ax.errorbar(tau_vals, agg["eff_emp"].values, yerr=agg["eff_emp_sem"].values,
             label=f"IBR empirical")
 
 # Formatting
-ax.set_xlabel(r"Information group number $\tau(G)$")
+ax.set_xlabel(r"Information group number $\gamma(G)$")
 ax.set_ylabel("Efficiency ratio")
 ax.set_ylim(0, 1.05)
 ax.set_xticks(tau_vals)

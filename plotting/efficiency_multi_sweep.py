@@ -21,12 +21,12 @@ import pandas as pd
 matplotlib.rcParams.update({
     "font.family":        "serif",
     "font.serif":         ["Times New Roman", "DejaVu Serif"],
-    "font.size":          10,
-    "axes.titlesize":     10,
-    "axes.labelsize":     10,
-    "xtick.labelsize":    9,
-    "ytick.labelsize":    9,
-    "legend.fontsize":    8,
+    "font.size":          13,
+    "axes.titlesize":     13,
+    "axes.labelsize":     13,
+    "xtick.labelsize":    12,
+    "ytick.labelsize":    12,
+    "legend.fontsize":    11,
     "legend.framealpha":  0.9,
     "legend.edgecolor":   "0.8",
     "axes.spines.top":    False,
@@ -63,24 +63,24 @@ SHOW_VUG_BOUNDS = False
 SWEEP_CONFIGS = [
     # --- Probability sweep (fix win=30, 5dep/15dr) ---
     # ("$p=0.5,\\; w=30$",   "#2166AC", "o", "-",  {"prob": 0.5,  "win": 30, "dr": 15, "dep": 5}),
-    ("$p=0.75,\\; w=30$",  "#67A9CF", "s", "-",  {"prob": 0.75, "win": 30, "dr": 15, "dep": 5}),
-    ("$p=1.0,\\; w=30$",   "#D1E5F0", "^", "-",  {"prob": 1.0,  "win": 30, "dr": 15, "dep": 5}),
+    # ("$p=0.75,\\; w=30$",  "#67A9CF", "o", "--",  {"prob": 0.75, "win": 30, "dr": 15, "dep": 5}),
+    ("$p=1.0,\\; w=30$",   "#2286BD", "o", "--",  {"prob": 1.0,  "win": 30, "dr": 15, "dep": 5}),
 
     # --- Window sweep (fix prob=0.5, 5dep/15dr) ---
-    ("$p=0.5,\\; w=15$",   "#B2182B", "o", "--", {"prob": 0.5, "win": 15, "dr": 15, "dep": 5}),
-    ("$p=0.5,\\; w=45$",   "#FDDBC7", "D", "--", {"prob": 0.5, "win": 45, "dr": 15, "dep": 5}),
+    # ("$p=0.5,\\; w=15$",   "#7A18B2", "D", "--", {"prob": 0.5, "win": 15, "dr": 15, "dep": 5}),
+    ("$p=0.5,\\; w=45$",   "#D67EEC", "D", "--", {"prob": 0.5, "win": 45, "dr": 15, "dep": 5}),
 
     # --- Hardest setting ---
     # ("$p=1.0,\\; w=15$",   "#B2182B", "D", "--", {"prob": 1.0, "win": 15, "dr": 15, "dep": 5}),
 
     # --- Fleet configs (fix prob=0.5, win=30) ---
-    ("5 dep / 15 dr",  "#B2182B", "v", ":",  {"prob": 0.5, "win": 30, "dr": 15, "dep": 5}),
-    ("5 dep / 50 dr",  "#1B7837", "v", ":",  {"prob": 0.5, "win": 30, "dr": 50, "dep": 5}),
-    ("6 dep / 60 dr","#A6DBA0", "P", ":",  {"prob": 0.5, "win": 30, "dr": 60, "dep": 6}),
+    ("5 depots / 15 drones",  "#18B225", "v", "--",  {"prob": 0.5, "win": 30, "dr": 15, "dep": 5}),
+    # ("5 dep / 50 dr",  "#1B7837", "v", "--",  {"prob": 0.5, "win": 30, "dr": 50, "dep": 5}),
+    # ("6 dep / 60 dr","#A6DBA0", "P", ":",  {"prob": 0.5, "win": 30, "dr": 60, "dep": 6}),
 
     # --- Spatial conflict (if you have darr field) ---
-    ("Low conflict",   "#F4A582", "<", "-.", {"prob": 0.5, "win": 45, "dr": 15, "dep": 5, "darr": "broad"}),
-    ("High conflict",  "#CA0020", ">", "-.", {"prob": 0.5, "win": 45, "dr": 15, "dep": 5, "darr": "narrow"}),
+    # ("Low conflict",   "#F04029", ">", "--", {"prob": 0.5, "win": 45, "dr": 15, "dep": 5, "darr": "broad"}),
+    ("High conflict",  "#CA0020", ">", "--", {"prob": 0.5, "win": 45, "dr": 15, "dep": 5, "darr": "narrow"}),
 ]
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -166,7 +166,7 @@ print(f"Win values:  {sorted(df_algo['win'].unique())}")
 print(f"Fleet:       {sorted(df_algo[['dep','dr']].drop_duplicates().values.tolist())}")
 
 # ── Plot ──────────────────────────────────────────────────────────────────────
-fig, ax = plt.subplots(figsize=(5.5, 4.0))
+fig, ax = plt.subplots(figsize=(5.5, 3.0))
 
 any_plotted = False
 
@@ -209,9 +209,12 @@ for label, color, marker, ls, filters in SWEEP_CONFIGS:
 
     ax.errorbar(tau_vals, eff_vals, yerr=sem_vals,
                 color=color, marker=marker, markersize=6,
-                linewidth=1.6, linestyle=ls, capsize=3,
+                linewidth=1., linestyle=ls, capsize=3,
                 label=label, zorder=4)
-
+    # ax.errorbar(tau_vals, eff_vals, yerr=sem_vals,
+    #             color=color, marker=marker, markersize=3,
+    #             linestyle="none",
+    #             capsize=3, label=label, zorder=4, alpha=0.7)
     any_plotted = True
 
     # Print summary
@@ -238,7 +241,7 @@ if SHOW_VUG_BOUNDS:
             label=r"Consistent: $\frac{1}{1+\alpha^*}$")
 
 # ── Formatting ────────────────────────────────────────────────────────────────
-ax.set_xlabel(r"Information group number $\tau(G)$")
+ax.set_xlabel(r"Information group number $\gamma(G)$")
 ax.set_ylabel("Efficiency ratio")
 # ax.set_ylim(0, 1.08)
 
@@ -257,7 +260,7 @@ pad = 0.3
 ax.set_xlim(min(all_taus) - pad, max(all_taus) + pad)
 
 # ── Save ──────────────────────────────────────────────────────────────────────
-fig_name = f"poa_efficiency_multisweep_{TARGET_ALGO}.pdf"
+fig_name = f"poa_efficiency_multisweep_{TARGET_ALGO}_short.pdf"
 fig.savefig(os.path.join(OUTPUT_DIR, fig_name))
 fig.savefig(os.path.join(OUTPUT_DIR, fig_name.replace(".pdf", ".png")))
 plt.close(fig)

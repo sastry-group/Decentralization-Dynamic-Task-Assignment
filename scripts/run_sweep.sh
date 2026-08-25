@@ -1,50 +1,41 @@
-#!/usr/bin/env bash
-# =============================================================
-# run_sweep.sh — Parameter sweep for benchmark_routing.py
-#
-# Sweeps over:
-#   1. Algorithm (--baseline)
-#   2. Depot order (--depot-order)
-#   3. Comms graph structure (--comms_mode)
-#
-# Results are written to results/<timestamp>/ with one subfolder
-# per configuration.  Logs and a summary CSV are produced.
-# =============================================================
-
 set -euo pipefail
 
 # ── Conda / Python ────────────────────────────────────────────
 PYTHON="/home/gaby/anaconda3/envs/dynMATA/bin/python"
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"   # adjust if script lives in scripts/
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT="${SCRIPT_DIR}/scripts/benchmark_routing.py"
 
 # ── Fixed parameters ──────────────────────────────────────────
 TRIALS=100
 TIMESTEPS=200
-N_DRONES=15
+N_DRONES=50
 N_DEPOTS=5
-NEW_REQ_PROB=0.5
-TIME_WINDOW=45
 INIT_METHOD="empty"
+NUM_INIT_REQUESTS=75
+PKG_DENSITY="nominal"
 
 # ── Sweep axes (edit these lists) ─────────────────────────────
-# ALGOS=("edd" "hungarian" "ibr")
+# ALGOS=("edd" "hungarian" "ibr" "scoba")
 ALGOS=("ibr")
-# DEPOT_ORDERS=("asc" "desc" "random")
+# ALGOS=("scoba")
 DEPOT_ORDERS=("random")
-COMMS_MODES=("full" "rm_12" "rm_12_31" "rm_12_31_43"  "none")
+COMMS_MODES=("full" "rm_12_31_43" "none" "rm_12_31" "rm_12")
+# COMMS_MODES=("brm_12_45" "ring" "star" "brm_12" "none" "full")
+# REQ_PROBS=(0.5 0.75 1.0)
+REQ_PROBS=(0.5)
+# TIME_WINDOWS=(15 30 45)
+TIME_WINDOWS=(30)
 
 # ── Output directory ──────────────────────────────────────────
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RESULTS_DIR="${SCRIPT_DIR}/results/sweep_${TIMESTAMP}"
 mkdir -p "${RESULTS_DIR}"
 
-# CSV header
 SUMMARY="${RESULTS_DIR}/summary.csv"
-echo "algo,depot_order,comms_mode,status,log_file" > "${SUMMARY}"
+echo "algo,depot_order,comms_mode,req_prob,time_window,overlap,status,log_file" > "${SUMMARY}"
 
-# ── Total run count ───────────────────────────────────────────
-TOTAL=$(( ${#ALGOS[@]} * ${#DEPOT_ORDERS[@]} * ${#COMMS_MODES[@]} ))
+TOTAL=$(( ${#ALGOS[@]} * ${#DEPOT_ORDERS[@]} * ${#COMMS_MODES[@]} \
+        * ${#REQ_PROBS[@]} * ${#TIME_WINDOWS[@]} ))
 RUN=0
 
 echo "=========================================="
@@ -55,46 +46,59 @@ echo "=========================================="
 for ALGO in "${ALGOS[@]}"; do
   for DEPOT in "${DEPOT_ORDERS[@]}"; do
     for COMMS in "${COMMS_MODES[@]}"; do
+      for PROB in "${REQ_PROBS[@]}"; do
+        for WIN in "${TIME_WINDOWS[@]}"; do
 
-      RUN=$((RUN + 1))
-      TAG="${ALGO}__depot-${DEPOT}__comms-${COMMS}"
-      RUN_DIR="${RESULTS_DIR}/${TAG}"
-      mkdir -p "${RUN_DIR}"
-      LOG="${RUN_DIR}/run.log"
+          RUN=$((RUN + 1))
+          TAG="${ALGO}__depot-${DEPOT}__comms-${COMMS}__prob-${PROB}__win-${WIN}"
+          RUN_DIR="${RESULTS_DIR}/${TAG}"
+          mkdir -p "${RUN_DIR}"
+          LOG="${RUN_DIR}/run.log"
 
-      echo ""
-      echo "[${RUN}/${TOTAL}] algo=${ALGO}  depot=${DEPOT}  comms=${COMMS}"
-      echo "  log → ${LOG}"
+          # scoba does not take overlapping claims
+          if [ "${ALGO}" = "scoba-full" ]; then
+            OVERLAP_FLAG=()
+            OVERLAP_TAG="no"
+          else
+            OVERLAP_FLAG=(--allow-overlap)
+            OVERLAP_TAG="yes"
+          fi
 
-      # ── Launch ──────────────────────────────────────────────
-      set +e
-      PYTHONPATH="${SCRIPT_DIR}" "${PYTHON}" "${SCRIPT}" \
-        --trials       "${TRIALS}" \
-        --timesteps    "${TIMESTEPS}" \
-        --allow-overlap \
-        --comms_mode   "${COMMS}" \
-        --n_drones     "${N_DRONES}" \
-        --n_depots     "${N_DEPOTS}" \
-        --new_request_prob "${NEW_REQ_PROB}" \
-        --time_window  "${TIME_WINDOW}" \
-        --baseline     "${ALGO}" \
-        --num-init-requests "100" \
-        --dynamic_tasks \
-        --init_method  "${INIT_METHOD}" \
-        --depot-order  "${DEPOT}" \
-        > "${LOG}" 2>&1
-      EXIT_CODE=$?
-      set -e
+          echo ""
+          echo "[${RUN}/${TOTAL}] algo=${ALGO} depot=${DEPOT} comms=${COMMS} prob=${PROB} win=${WIN} overlap=${OVERLAP_TAG}"
+          echo "  log → ${LOG}"
 
-      if [ ${EXIT_CODE} -eq 0 ]; then
-        STATUS="ok"
-      else
-        STATUS="FAIL(${EXIT_CODE})"
-        echo "  ⚠  exited with code ${EXIT_CODE}"
-      fi
+          set +e
+          PYTHONPATH="${SCRIPT_DIR}" "${PYTHON}" "${SCRIPT}" \
+            --trials       "${TRIALS}" \
+            --timesteps    "${TIMESTEPS}" \
+            "${OVERLAP_FLAG[@]}" \
+            --comms_mode   "${COMMS}" \
+            --n_drones     "${N_DRONES}" \
+            --n_depots     "${N_DEPOTS}" \
+            --new_request_prob "${PROB}" \
+            --time_window  "${WIN}" \
+            --baseline     "${ALGO}" \
+            --num-init-requests "${NUM_INIT_REQUESTS}" \
+            --dynamic_tasks \
+            --init_method  "${INIT_METHOD}" \
+            --depot-order  "${DEPOT}" \
+            --package-density "${PKG_DENSITY}" \
+            > "${LOG}" 2>&1
+          EXIT_CODE=$?
+          set -e
 
-      echo "${ALGO},${DEPOT},${COMMS},${STATUS},${LOG}" >> "${SUMMARY}"
+          if [ ${EXIT_CODE} -eq 0 ]; then
+            STATUS="ok"
+          else
+            STATUS="FAIL(${EXIT_CODE})"
+            echo "  exited with code ${EXIT_CODE}"
+          fi
 
+          echo "${ALGO},${DEPOT},${COMMS},${PROB},${WIN},${OVERLAP_TAG},${STATUS},${LOG}" >> "${SUMMARY}"
+
+        done
+      done
     done
   done
 done
