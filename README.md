@@ -1,5 +1,5 @@
 ## Note! This code is being cleaned for public release... clean version will be done by 10/01/2026 
-Link to paper: 
+# Link to paper: https://arxiv.org/abs/2604.11954
 
 ## Project Overview
 
