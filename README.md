@@ -1,3 +1,5 @@
+## Note! This code is being cleaned 
+
 ## Project Overview
 
 This is a research codebase for **decentralized multi-agent task assignment (dMTA)** — specifically, drone delivery routing with multiple depots and communication-constrained coordination. The simulation runs over San Francisco using Halton-sampled travel time estimates.
